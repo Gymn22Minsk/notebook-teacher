@@ -3145,8 +3145,11 @@
             if (fileObj.url) {
                 if (filename.endsWith('.pdf')) {
                     document.getElementById('docViewerFrame').src = fileObj.url;
+                } else if (filename.endsWith('.docx') || filename.endsWith('.doc')) {
+                    // Word — Google Docs Viewer (лучше работает с DOCX)
+                    document.getElementById('docViewerFrame').src = `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(fileObj.url)}`;
                 } else {
-                    // Word / PowerPoint — Microsoft Office Online Viewer
+                    // PowerPoint — Microsoft Office Online Viewer
                     document.getElementById('docViewerFrame').src = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileObj.url)}`;
                 }
                 document.getElementById('docViewerModal').style.display = 'flex';
