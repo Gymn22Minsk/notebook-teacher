@@ -3140,10 +3140,35 @@
                 const blob = new Blob([byteArray], { type: mimeType });
                 const blobUrl = URL.createObjectURL(blob);
                 
-                // Открываем в модальном окне вместо скачивания
+                // Открываем в модальном окне
                 document.getElementById('docViewerTitle').textContent = filename;
-                document.getElementById('docViewerFrame').src = `https://docs.google.com/viewer?url=${encodeURIComponent(blobUrl)}&embedded=true`;
-                document.getElementById('docViewerModal').style.display = 'flex';
+                
+                if (filename.endsWith('.pdf')) {
+                    // PDF можно смотреть прямо в браузере
+                    document.getElementById('docViewerFrame').src = blobUrl;
+                    document.getElementById('docViewerModal').style.display = 'flex';
+                } else {
+                    // DOCX/DOC/PPTX — скачиваем файл
+                    const link = document.createElement('a');
+                    link.href = blobUrl;
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    // Показываем сообщение в модалке
+                    document.getElementById('docViewerFrame').srcdoc = `
+                        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; font-family:Montserrat,sans-serif; color:#1e293b; background:#faf6ee;">
+                            <div style="font-size:64px; margin-bottom:20px;">📥</div>
+                            <h2 style="margin-bottom:10px; font-family:'Playfair Display',serif;">Файл загружается</h2>
+                            <p style="color:#475569; font-weight:600;">${filename}</p>
+                            <p style="color:#94a3b8; font-size:14px; margin-top:15px; max-width:400px; text-align:center;">
+                                Откройте загруженный файл в Microsoft Word или другом приложении.
+                            </p>
+                        </div>
+                    `;
+                    document.getElementById('docViewerModal').style.display = 'flex';
+                }
             } catch(e) {
                 console.error(e);
                 alert("Ошибка декодирования и скачивания файла.");
@@ -3154,6 +3179,7 @@
         function closeDocViewer() {
             document.getElementById('docViewerModal').style.display = 'none';
             document.getElementById('docViewerFrame').src = '';
+            document.getElementById('docViewerFrame').srcdoc = '';
         }
 
         // === ОТРИСОВКА СПИСКОВ ФАЙЛОВ НА СТРАНИЦАХ ===
