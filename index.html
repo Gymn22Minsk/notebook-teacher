@@ -348,17 +348,14 @@
 
         /* Обложка Cover-Face элементы */
         .cover-logo {
-            width: 100px;
-            height: 100px;
-            border: 2px solid #d4af37;
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            width: 140px;
+            height: 140px;
+            background-image: url('logo.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
             margin-bottom: 35px;
-            box-shadow: 0 0 15px rgba(212,175,55,0.2);
-            color: #d4af37;
-            font-size: 36px;
+            filter: drop-shadow(0 0 12px rgba(212,175,55,0.35));
         }
 
         .cover-title {
@@ -1036,7 +1033,7 @@
                 <div class="spiral-spine" id="spiralSpine"><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div></div>
                 <!-- Страницы -->
                 <div class="pages-container" id="pagesContainer"><div class="page-sheet" data-index="0"><div class="face front cover-front">
-                        <div class="cover-logo">📖</div>
+                        <div class="cover-logo"></div>
                         <div class="cover-title">Блокнот</div>
                         <div class="cover-title" style="font-size:26px; color:#d4af37;">молодого учителя</div>
                         <div class="cover-subtitle">Республики Беларусь</div>
@@ -2464,7 +2461,7 @@
                 type: 'cover',
                 front: {
                     html: `
-                        <div class="cover-logo">📖</div>
+                        <div class="cover-logo"></div>
                         <div class="cover-title">Блокнот</div>
                         <div class="cover-title" style="font-size:26px; color:#d4af37;">молодого учителя</div>
                         <div class="cover-subtitle">Республики Беларусь</div>
