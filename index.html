@@ -3142,18 +3142,27 @@
             }
 
             document.getElementById('docViewerTitle').textContent = filename;
+            const frame = document.getElementById('docViewerFrame');
 
             // Если есть URL из Supabase — открываем через онлайн-просмотрщики
             if (fileObj.url) {
+                let viewerUrl;
                 if (filename.endsWith('.pdf')) {
-                    document.getElementById('docViewerFrame').src = fileObj.url;
+                    viewerUrl = fileObj.url;
                 } else if (filename.endsWith('.docx') || filename.endsWith('.doc')) {
-                    // Word — Microsoft Office Online (альтернативный URL)
-                    document.getElementById('docViewerFrame').src = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(fileObj.url)}`;
+                    // Word — Microsoft Office Online + cache-buster чтобы не было белого экрана
+                    viewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(fileObj.url)}&cb=${Date.now()}`;
                 } else {
                     // PowerPoint — Microsoft Office Online Viewer
-                    document.getElementById('docViewerFrame').src = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileObj.url)}`;
+                    viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileObj.url)}&cb=${Date.now()}`;
                 }
+                
+                // Сначала очищаем iframe, потом загружаем новый URL
+                frame.src = 'about:blank';
+                setTimeout(() => {
+                    frame.src = viewerUrl;
+                }, 150);
+                
                 document.getElementById('docViewerModal').style.display = 'flex';
                 return;
             }
@@ -3162,11 +3171,12 @@
             alert('Файл ещё не синхронизирован с облаком. Подождите или загрузите заново.');
         }
 
-        // НОВОЕ: Закрыть модальное окно просмотра документа
+        // Закрыть модальное окно просмотра документа
         function closeDocViewer() {
             document.getElementById('docViewerModal').style.display = 'none';
-            document.getElementById('docViewerFrame').src = '';
-            document.getElementById('docViewerFrame').srcdoc = '';
+            const frame = document.getElementById('docViewerFrame');
+            frame.src = 'about:blank';
+            frame.removeAttribute('srcdoc');
         }
 
         // === ОТРИСОВКА СПИСКОВ ФАЙЛОВ НА СТРАНИЦАХ ===
