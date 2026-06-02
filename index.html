@@ -2247,7 +2247,9 @@
                 });
                 
                 if (!response.ok) {
-                    throw new Error(`Supabase upload failed: ${response.status}`);
+                    const errorText = await response.text();
+                    console.error('Supabase error response:', errorText);
+                    throw new Error(`Supabase upload failed: ${response.status} - ${errorText}`);
                 }
                 
                 // 2. Формируем публичный URL
