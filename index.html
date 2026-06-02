@@ -8,7 +8,7 @@
     <!-- Firebase Scripts (compat версии для обычного <script>) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -2174,7 +2174,6 @@
                 snapshot.forEach(doc => {
                     const fileObj = doc.data();
                     activeCustomDocuments[fileObj.name] = fileObj;
-                    localUploadedDocs[fileObj.name] = fileObj;
                     saveDocToDB(fileObj.name, fileObj);
                     count++;
                 });
@@ -2193,15 +2192,9 @@
         function listenToFirebaseChanges() {
             try {
                 firebaseDb.collection("documents").onSnapshot(snapshot => {
-                    snapshot.docChanges().forEach(change => {
-                        const fileObj = change.doc.data();
-                        if (change.type === "removed") {
-                            delete activeCustomDocuments[fileObj.name];
-                            delete localUploadedDocs[fileObj.name];
-                        } else {
-                            activeCustomDocuments[fileObj.name] = fileObj;
-                            localUploadedDocs[fileObj.name] = fileObj;
-                        }
+                    snapshot.forEach(doc => {
+                        const fileObj = doc.data();
+                        activeCustomDocuments[fileObj.name] = fileObj;
                     });
                     
                     console.log("🔄 Получены обновления из Firebase!");
@@ -2212,37 +2205,16 @@
             }
         }
 
-        // Загрузить файл на Firebase Storage + метаданные в Firestore
-        async function uploadFileToFirebase(file, fileObj) {
+        // Загрузить файл на Firebase (Firestore с base64)
+        async function uploadFileToFirebase(fileObj) {
             if (!isFirebaseReady) {
                 console.warn("⚠️ Firebase не готов");
                 return false;
             }
             
             try {
-                // 1. Загружаем файл в Storage
-                const storageRef = firebase.storage().ref('documents/' + fileObj.name);
-                const snapshot = await storageRef.put(file);
-                const url = await snapshot.ref.getDownloadURL();
-                
-                // 2. Сохраняем метаданные в Firestore
-                const docData = {
-                    name: fileObj.name,
-                    url: url,
-                    type: fileObj.fileType || "application/octet-stream",
-                    sectionId: fileObj.sectionId || "didaktika",
-                    subfolderId: fileObj.subfolderId || "",
-                    size: fileObj.size || 0,
-                    uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
-                };
-                await firebaseDb.collection("documents").doc(fileObj.name).set(docData);
-                
-                // 3. Обновляем локальные данные
-                activeCustomDocuments[fileObj.name] = docData;
-                localUploadedDocs[fileObj.name] = docData;
-                await saveDocToDB(fileObj.name, docData);
-                
-                console.log(`✅ "${fileObj.name}" загружен на Firebase Storage`);
+                await firebaseDb.collection("documents").doc(fileObj.name).set(fileObj);
+                console.log(`✅ "${fileObj.name}" загружен на Firebase`);
                 return true;
             } catch (error) {
                 console.error(`❌ Ошибка загрузки на Firebase:`, error);
@@ -2250,18 +2222,12 @@
             }
         }
 
-        // Удалить файл с Firebase Storage + Firestore
+        // Удалить файл с Firebase
         async function deleteFileFromFirebase(filename) {
             if (!isFirebaseReady) return false;
             
             try {
-                // Удаляем из Storage
-                const storageRef = firebase.storage().ref('documents/' + filename);
-                await storageRef.delete();
-                
-                // Удаляем метаданные из Firestore
                 await firebaseDb.collection("documents").doc(filename).delete();
-                
                 console.log(`✅ "${filename}" удалён с Firebase`);
                 return true;
             } catch (error) {
@@ -3070,7 +3036,7 @@
             }
         }
 
-        // === ОТКРЫТИЕ ФАЙЛОВ В МОДАЛЬНОМ ОКНЕ (БЕЗ СКАЧИВАНИЯ) ===
+        // === ОТКРЫТИЕ ФАЙЛОВ В МОДАЛЬНОМ ОКНЕ ===
         function openFile(filename) {
             const fileObj = activeCustomDocuments[filename] || allDocuments[filename];
             
@@ -3079,56 +3045,94 @@
                 return;
             }
 
-            // Если есть URL из Firebase Storage — открываем через онлайн-просмотрщики
-            if (fileObj.url) {
-                document.getElementById('docViewerTitle').textContent = filename;
-                
-                if (filename.endsWith('.pdf')) {
-                    // PDF — встроенный просмотрщик браузера
-                    document.getElementById('docViewerFrame').src = fileObj.url;
-                } else if (filename.endsWith('.docx') || filename.endsWith('.doc') || filename.endsWith('.pptx') || filename.endsWith('.ppt')) {
-                    // Word / PowerPoint — Microsoft Office Online Viewer
-                    document.getElementById('docViewerFrame').src = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileObj.url)}`;
-                } else {
-                    // Другие форматы — открываем напрямую
-                    document.getElementById('docViewerFrame').src = fileObj.url;
-                }
-                
-                document.getElementById('docViewerModal').style.display = 'flex';
+            document.getElementById('docViewerTitle').textContent = filename;
+
+            // PDF — встроенный просмотрщик браузера
+            if (filename.endsWith('.pdf')) {
+                try {
+                    const byteCharacters = atob(fileObj.base64 ? fileObj.base64 : fileObj);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: "application/pdf" });
+                    const blobUrl = URL.createObjectURL(blob);
+                    document.getElementById('docViewerFrame').src = blobUrl;
+                    document.getElementById('docViewerModal').style.display = 'flex';
+                } catch(e) { console.error(e); alert("Ошибка открытия PDF."); }
                 return;
             }
-            
-            // Fallback для старых файлов с base64 (если вдруг остались)
-            if (fileObj.base64) {
+
+            // DOCX — конвертация в HTML через mammoth.js
+            if (filename.endsWith('.docx')) {
                 try {
                     const byteCharacters = atob(fileObj.base64);
                     const byteNumbers = new Array(byteCharacters.length);
-                    for (let i = 0; i < byteCharacters.length; i++) {
-                        byteNumbers[i] = byteCharacters.charCodeAt(i);
-                    }
+                    for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
                     const byteArray = new Uint8Array(byteNumbers);
                     
-                    let mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-                    if (filename.endsWith('.pptx')) {
-                        mimeType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-                    } else if (filename.endsWith('.pdf')) {
-                        mimeType = "application/pdf";
-                    }
-                    
-                    const blob = new Blob([byteArray], { type: mimeType });
-                    const blobUrl = URL.createObjectURL(blob);
-                    
-                    document.getElementById('docViewerTitle').textContent = filename;
-                    document.getElementById('docViewerFrame').src = blobUrl;
-                    document.getElementById('docViewerModal').style.display = 'flex';
-                } catch(e) {
-                    console.error(e);
-                    alert("Ошибка открытия файла.");
-                }
+                    mammoth.convertToHtml({ arrayBuffer: byteArray.buffer })
+                        .then(result => {
+                            const html = `
+                                <style>
+                                    body { font-family: 'Montserrat', sans-serif; padding: 30px; color: #1e293b; background: #faf6ee; line-height: 1.7; max-width: 800px; margin: 0 auto; }
+                                    p { margin-bottom: 14px; text-align: justify; }
+                                    table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px; }
+                                    td, th { border: 1px solid #cbd5e1; padding: 10px; text-align: left; }
+                                    th { background: #f1f5f9; font-weight: 600; }
+                                    h1, h2, h3 { font-family: 'Playfair Display', serif; margin: 20px 0 12px; color: #0f172a; }
+                                    ul, ol { margin: 10px 0 10px 20px; }
+                                    li { margin-bottom: 6px; }
+                                    strong { color: #0f172a; }
+                                </style>
+                                ${result.value}
+                            `;
+                            document.getElementById('docViewerFrame').srcdoc = html;
+                            document.getElementById('docViewerModal').style.display = 'flex';
+                        })
+                        .catch(err => {
+                            console.error("Mammoth error:", err);
+                            alert("Не удалось открыть DOCX. Попробуйте скачать файл.");
+                        });
+                } catch(e) { console.error(e); alert("Ошибка обработки DOCX."); }
                 return;
             }
-            
-            alert('Файл ещё не загружен в облако. Подождите синхронизации или загрузите файл заново.');
+
+            // PPTX и остальные — скачивание
+            try {
+                const byteCharacters = atob(fileObj.base64 ? fileObj.base64 : fileObj);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
+                const byteArray = new Uint8Array(byteNumbers);
+                
+                let mimeType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+                if (filename.endsWith('.doc')) mimeType = "application/msword";
+                
+                const blob = new Blob([byteArray], { type: mimeType });
+                const blobUrl = URL.createObjectURL(blob);
+                
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                // Показываем сообщение в модалке
+                document.getElementById('docViewerFrame').srcdoc = `
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; font-family:Montserrat,sans-serif; color:#1e293b; background:#faf6ee;">
+                        <div style="font-size:64px; margin-bottom:20px;">📥</div>
+                        <h2 style="margin-bottom:10px; font-family:'Playfair Display',serif;">Файл загружается</h2>
+                        <p style="color:#475569; font-weight:600;">${filename}</p>
+                        <p style="color:#94a3b8; font-size:14px; margin-top:15px; max-width:400px; text-align:center;">
+                            Откройте загруженный файл в соответствующем приложении.
+                        </p>
+                    </div>
+                `;
+                document.getElementById('docViewerModal').style.display = 'flex';
+            } catch(e) {
+                console.error(e);
+                alert("Ошибка скачивания файла.");
+            }
         }
 
         // НОВОЕ: Закрыть модальное окно просмотра документа
@@ -3334,33 +3338,39 @@
 
             for (let i = 0; i < totalFiles; i++) {
                 const file = files[i];
-                
-                // Создаём метаданные
-                const fileObj = {
-                    name: file.name,
-                    sectionId: sectionId,
-                    subfolderId: subfolderId,
-                    fileType: file.type,
-                    size: file.size,
-                    uploadedAt: new Date().toISOString()
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    const fullBase64 = e.target.result;
+                    const cleanBase64 = fullBase64.split(',')[1];
+
+                    const fileObj = {
+                        name: file.name,
+                        base64: cleanBase64,
+                        sectionId: sectionId,
+                        subfolderId: subfolderId,
+                        fileType: file.type,
+                        size: file.size,
+                        uploadedAt: new Date().toISOString()
+                    };
+
+                    // Сохраняем локально в IndexedDB
+                    localUploadedDocs[file.name] = fileObj;
+                    activeCustomDocuments[file.name] = fileObj;
+                    await saveDocToDB(file.name, fileObj);
+
+                    // Загружаем на Firebase
+                    if (isFirebaseReady) {
+                        await uploadFileToFirebase(fileObj);
+                    } else {
+                        console.warn("⚠️ Firebase не готов, файл сохранён только локально");
+                    }
+
+                    loadedCount++;
+                    if (loadedCount === totalFiles) {
+                        renderAllFilesLists();
+                    }
                 };
-
-                // Сохраняем локально (пока без URL)
-                localUploadedDocs[file.name] = fileObj;
-                activeCustomDocuments[file.name] = fileObj;
-                await saveDocToDB(file.name, fileObj);
-
-                // Загружаем на Firebase Storage
-                if (isFirebaseReady) {
-                    await uploadFileToFirebase(file, fileObj);
-                } else {
-                    console.warn("⚠️ Firebase не готов, файл сохранён только локально");
-                }
-
-                loadedCount++;
-                if (loadedCount === totalFiles) {
-                    renderAllFilesLists();
-                }
+                reader.readAsDataURL(file);
             }
         }
 
