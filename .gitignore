@@ -1,0 +1,30 @@
+# 📚 Инструкции - не загружаем
+00_START_HERE.md
+CLOUD_SYNC_ALTERNATIVES.md
+CLOUD_SYNC_FIREBASE.md
+CLOUD_SYNC_QUICK_CHOICE.md
+FIREBASE_SETUP_STEP_BY_STEP.md
+NETLIFY_DEPLOYMENT.md
+NETLIFY_QUICK_START.md
+NETLIFY_TROUBLESHOOTING.md
+IMPROVEMENTS.md
+NAVIGATION.md
+RUN_SERVER.md
+CLEANUP_GUIDE.md
+GIT_DEPLOY_GUIDE.md
+COMPLETE_SETUP_GITHUB_NETLIFY.md
+
+# 🖥️ Локальные серверные файлы
+server.py
+server.bat
+server.sh
+
+# 📄 Альтернативная версия
+index_v2.html
+
+# 🔧 System files
+.DS_Store
+Thumbs.db
+node_modules/
+.env
+.env.local
