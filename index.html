@@ -49,8 +49,8 @@
         .scene {
             position: relative;
             z-index: 1;
-            width: 1140px;
-            height: 740px;
+            width: 1260px;
+            height: 820px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -58,8 +58,8 @@
 
         .book-wrapper {
             position: relative;
-            width: 1040px;
-            height: 680px;
+            width: 1150px;
+            height: 760px;
             perspective: 2500px;
         }
 
@@ -3212,14 +3212,14 @@
                         card.className = 'doc-card';
                         card.innerHTML = `
                             <div class="doc-card-icon">DOCX</div>
-                            <div class="doc-card-info" onclick="openFile('${filename}')" style="cursor:pointer;">
+                            <div class="doc-card-info" onclick="event.stopPropagation(); openFile('${filename}')" style="cursor:pointer;">
                                 <div class="doc-card-name" title="${filename}">${filename}</div>
                                 <div class="doc-card-size">${sizeText}</div>
                             </div>
-                            <div class="doc-card-download" onclick="openFile('${filename}')" style="cursor:pointer;" title="Открыть">
+                            <div class="doc-card-download" onclick="event.stopPropagation(); openFile('${filename}')" style="cursor:pointer;" title="Открыть">
                                 👁️
                             </div>
-                            ${isAdminActive ? `<button class="delete-btn" onclick="deleteFile('${filename}', '${sectionId}', ${isCustom})" title="Удалить файл">&times;</button>` : ''}
+                            ${isAdminActive ? `<button class="delete-btn" onclick="event.stopPropagation(); deleteFile('${filename}', '${sectionId}', ${isCustom})" title="Удалить файл">&times;</button>` : ''}
                         `;
                         listEl.appendChild(card);
                     });
