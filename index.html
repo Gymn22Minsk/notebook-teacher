@@ -8,6 +8,7 @@
     <!-- Firebase Scripts (compat версии для обычного <script>) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -2173,6 +2174,7 @@
                 snapshot.forEach(doc => {
                     const fileObj = doc.data();
                     activeCustomDocuments[fileObj.name] = fileObj;
+                    localUploadedDocs[fileObj.name] = fileObj;
                     saveDocToDB(fileObj.name, fileObj);
                     count++;
                 });
@@ -2191,9 +2193,15 @@
         function listenToFirebaseChanges() {
             try {
                 firebaseDb.collection("documents").onSnapshot(snapshot => {
-                    snapshot.forEach(doc => {
-                        const fileObj = doc.data();
-                        activeCustomDocuments[fileObj.name] = fileObj;
+                    snapshot.docChanges().forEach(change => {
+                        const fileObj = change.doc.data();
+                        if (change.type === "removed") {
+                            delete activeCustomDocuments[fileObj.name];
+                            delete localUploadedDocs[fileObj.name];
+                        } else {
+                            activeCustomDocuments[fileObj.name] = fileObj;
+                            localUploadedDocs[fileObj.name] = fileObj;
+                        }
                     });
                     
                     console.log("🔄 Получены обновления из Firebase!");
@@ -2204,16 +2212,37 @@
             }
         }
 
-        // Загрузить файл на Firebase
-        async function uploadFileToFirebase(fileObj) {
+        // Загрузить файл на Firebase Storage + метаданные в Firestore
+        async function uploadFileToFirebase(file, fileObj) {
             if (!isFirebaseReady) {
                 console.warn("⚠️ Firebase не готов");
                 return false;
             }
             
             try {
-                await firebaseDb.collection("documents").doc(fileObj.name).set(fileObj);
-                console.log(`✅ "${fileObj.name}" загружен на Firebase`);
+                // 1. Загружаем файл в Storage
+                const storageRef = firebase.storage().ref('documents/' + fileObj.name);
+                const snapshot = await storageRef.put(file);
+                const url = await snapshot.ref.getDownloadURL();
+                
+                // 2. Сохраняем метаданные в Firestore
+                const docData = {
+                    name: fileObj.name,
+                    url: url,
+                    type: fileObj.fileType || "application/octet-stream",
+                    sectionId: fileObj.sectionId || "didaktika",
+                    subfolderId: fileObj.subfolderId || "",
+                    size: fileObj.size || 0,
+                    uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                await firebaseDb.collection("documents").doc(fileObj.name).set(docData);
+                
+                // 3. Обновляем локальные данные
+                activeCustomDocuments[fileObj.name] = docData;
+                localUploadedDocs[fileObj.name] = docData;
+                await saveDocToDB(fileObj.name, docData);
+                
+                console.log(`✅ "${fileObj.name}" загружен на Firebase Storage`);
                 return true;
             } catch (error) {
                 console.error(`❌ Ошибка загрузки на Firebase:`, error);
@@ -2221,12 +2250,18 @@
             }
         }
 
-        // Удалить файл с Firebase
+        // Удалить файл с Firebase Storage + Firestore
         async function deleteFileFromFirebase(filename) {
             if (!isFirebaseReady) return false;
             
             try {
+                // Удаляем из Storage
+                const storageRef = firebase.storage().ref('documents/' + filename);
+                await storageRef.delete();
+                
+                // Удаляем метаданные из Firestore
                 await firebaseDb.collection("documents").doc(filename).delete();
+                
                 console.log(`✅ "${filename}" удалён с Firebase`);
                 return true;
             } catch (error) {
@@ -2614,14 +2649,8 @@
             }
         ];
 
-        // Соответствие файлов по умолчанию разделам
-        const defaultFilesMapping = {
-            "vneklass": ["klass_ruk.docx", "prog_vneurok.docx"],
-            "didaktika": ["analiz_uroka.docx"],
-            "mej_den": ["protokol.docx"],
-            "russkiy_jaz": ["plan_uroka.docx", "kalendar_temat.docx"],
-            "literatura": ["konspekt_open.docx"]
-        };
+        // Соответствие файлов по умолчанию разделам (пусто — только пользовательские файлы)
+        const defaultFilesMapping = {};
 
         const totalSpreads = pagesData.length;
 
@@ -3042,70 +3071,64 @@
         }
 
         // === ОТКРЫТИЕ ФАЙЛОВ В МОДАЛЬНОМ ОКНЕ (БЕЗ СКАЧИВАНИЯ) ===
-        function downloadEmbeddedFile(filename) {
-            let fileData = activeCustomDocuments[filename];
+        function openFile(filename) {
+            const fileObj = activeCustomDocuments[filename] || allDocuments[filename];
             
-            if (!fileData) {
-                fileData = allDocuments[filename];
-            }
-
-            if (!fileData) {
-                alert(`Файл "${filename}" не найден в сборке блокнота.`);
+            if (!fileObj) {
+                alert(`Файл "${filename}" не найден.`);
                 return;
             }
 
-            try {
-                const byteCharacters = atob(fileData.base64 ? fileData.base64 : fileData);
-                const byteNumbers = new Array(byteCharacters.length);
-                for (let i = 0; i < byteCharacters.length; i++) {
-                    byteNumbers[i] = byteCharacters.charCodeAt(i);
-                }
-                const byteArray = new Uint8Array(byteNumbers);
-                
-                // Определяем тип контента по расширению файла
-                let mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-                if (filename.endsWith('.pptx')) {
-                    mimeType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-                } else if (filename.endsWith('.pdf')) {
-                    mimeType = "application/pdf";
-                }
-                
-                const blob = new Blob([byteArray], { type: mimeType });
-                const blobUrl = URL.createObjectURL(blob);
-                
-                // Открываем в модальном окне
+            // Если есть URL из Firebase Storage — открываем через онлайн-просмотрщики
+            if (fileObj.url) {
                 document.getElementById('docViewerTitle').textContent = filename;
                 
                 if (filename.endsWith('.pdf')) {
-                    // PDF можно смотреть прямо в браузере
+                    // PDF — встроенный просмотрщик браузера
+                    document.getElementById('docViewerFrame').src = fileObj.url;
+                } else if (filename.endsWith('.docx') || filename.endsWith('.doc') || filename.endsWith('.pptx') || filename.endsWith('.ppt')) {
+                    // Word / PowerPoint — Microsoft Office Online Viewer
+                    document.getElementById('docViewerFrame').src = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileObj.url)}`;
+                } else {
+                    // Другие форматы — открываем напрямую
+                    document.getElementById('docViewerFrame').src = fileObj.url;
+                }
+                
+                document.getElementById('docViewerModal').style.display = 'flex';
+                return;
+            }
+            
+            // Fallback для старых файлов с base64 (если вдруг остались)
+            if (fileObj.base64) {
+                try {
+                    const byteCharacters = atob(fileObj.base64);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    
+                    let mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+                    if (filename.endsWith('.pptx')) {
+                        mimeType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+                    } else if (filename.endsWith('.pdf')) {
+                        mimeType = "application/pdf";
+                    }
+                    
+                    const blob = new Blob([byteArray], { type: mimeType });
+                    const blobUrl = URL.createObjectURL(blob);
+                    
+                    document.getElementById('docViewerTitle').textContent = filename;
                     document.getElementById('docViewerFrame').src = blobUrl;
                     document.getElementById('docViewerModal').style.display = 'flex';
-                } else {
-                    // DOCX/DOC/PPTX — скачиваем файл
-                    const link = document.createElement('a');
-                    link.href = blobUrl;
-                    link.download = filename;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    
-                    // Показываем сообщение в модалке
-                    document.getElementById('docViewerFrame').srcdoc = `
-                        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; font-family:Montserrat,sans-serif; color:#1e293b; background:#faf6ee;">
-                            <div style="font-size:64px; margin-bottom:20px;">📥</div>
-                            <h2 style="margin-bottom:10px; font-family:'Playfair Display',serif;">Файл загружается</h2>
-                            <p style="color:#475569; font-weight:600;">${filename}</p>
-                            <p style="color:#94a3b8; font-size:14px; margin-top:15px; max-width:400px; text-align:center;">
-                                Откройте загруженный файл в Microsoft Word или другом приложении.
-                            </p>
-                        </div>
-                    `;
-                    document.getElementById('docViewerModal').style.display = 'flex';
+                } catch(e) {
+                    console.error(e);
+                    alert("Ошибка открытия файла.");
                 }
-            } catch(e) {
-                console.error(e);
-                alert("Ошибка декодирования и скачивания файла.");
+                return;
             }
+            
+            alert('Файл ещё не загружен в облако. Подождите синхронизации или загрузите файл заново.');
         }
 
         // НОВОЕ: Закрыть модальное окно просмотра документа
@@ -3160,12 +3183,12 @@
                         card.className = 'doc-card';
                         card.innerHTML = `
                             <div class="doc-card-icon">DOCX</div>
-                            <div class="doc-card-info" onclick="downloadEmbeddedFile('${filename}')" style="cursor:pointer;">
+                            <div class="doc-card-info" onclick="openFile('${filename}')" style="cursor:pointer;">
                                 <div class="doc-card-name" title="${filename}">${filename}</div>
                                 <div class="doc-card-size">${sizeText}</div>
                             </div>
-                            <div class="doc-card-download" onclick="downloadEmbeddedFile('${filename}')" style="cursor:pointer;" title="Скачать">
-                                📥
+                            <div class="doc-card-download" onclick="openFile('${filename}')" style="cursor:pointer;" title="Открыть">
+                                👁️
                             </div>
                             ${isAdminActive ? `<button class="delete-btn" onclick="deleteFile('${filename}', '${sectionId}', ${isCustom})" title="Удалить файл">&times;</button>` : ''}
                         `;
@@ -3311,39 +3334,33 @@
 
             for (let i = 0; i < totalFiles; i++) {
                 const file = files[i];
-                const reader = new FileReader();
-                reader.onload = async function(e) {
-                    const fullBase64 = e.target.result;
-                    const cleanBase64 = fullBase64.split(',')[1];
-
-                    const fileObj = {
-                        name: file.name,
-                        base64: cleanBase64,
-                        sectionId: sectionId,
-                        subfolderId: subfolderId,
-                        fileType: file.type,
-                        size: file.size,
-                        uploadedAt: new Date().toISOString()
-                    };
-
-                    // Сохраняем локально в IndexedDB
-                    localUploadedDocs[file.name] = fileObj;
-                    activeCustomDocuments[file.name] = fileObj;
-                    await saveDocToDB(file.name, fileObj);
-
-                    // Загружаем на Firebase
-                    if (isFirebaseReady) {
-                        await uploadFileToFirebase(fileObj);
-                    } else {
-                        console.warn("⚠️ Firebase не готов, файл сохранён только локально");
-                    }
-
-                    loadedCount++;
-                    if (loadedCount === totalFiles) {
-                        renderAllFilesLists();
-                    }
+                
+                // Создаём метаданные
+                const fileObj = {
+                    name: file.name,
+                    sectionId: sectionId,
+                    subfolderId: subfolderId,
+                    fileType: file.type,
+                    size: file.size,
+                    uploadedAt: new Date().toISOString()
                 };
-                reader.readAsDataURL(file);
+
+                // Сохраняем локально (пока без URL)
+                localUploadedDocs[file.name] = fileObj;
+                activeCustomDocuments[file.name] = fileObj;
+                await saveDocToDB(file.name, fileObj);
+
+                // Загружаем на Firebase Storage
+                if (isFirebaseReady) {
+                    await uploadFileToFirebase(file, fileObj);
+                } else {
+                    console.warn("⚠️ Firebase не готов, файл сохранён только локально");
+                }
+
+                loadedCount++;
+                if (loadedCount === totalFiles) {
+                    renderAllFilesLists();
+                }
             }
         }
 
