@@ -2286,6 +2286,7 @@
                     sectionId: fileObj.sectionId,
                     subfolderId: fileObj.subfolderId || '',
                     size: fileObj.size,
+                    order: fileObj.order ?? 0,
                     uploadedAt: new Date().toISOString()
                 };
                 await firebaseDb.collection("documents").doc(fileObj.name).set(docData);
@@ -3200,6 +3201,14 @@
                     }
                 });
 
+                // Сортируем: сначала по порядку выбора (order), затем по имени
+                allFilesForSection.sort((a, b) => {
+                    const orderA = a.isCustom ? (activeCustomDocuments[a.name]?.order ?? 0) : 0;
+                    const orderB = b.isCustom ? (activeCustomDocuments[b.name]?.order ?? 0) : 0;
+                    if (orderA !== orderB) return orderA - orderB;
+                    return a.name.localeCompare(b.name);
+                });
+
                 if (allFilesForSection.length === 0) {
                     listEl.innerHTML = '<div style="font-size:12px; color:#94a3b8; font-style:italic; padding:6px 0;">Нет доступных материалов</div>';
                 } else {
@@ -3375,7 +3384,8 @@
                         subfolderId: subfolderId,
                         fileType: file.type,
                         size: file.size,
-                        uploadedAt: new Date().toISOString()
+                        uploadedAt: new Date().toISOString(),
+                        order: i
                     };
 
                     // Сохраняем локально в IndexedDB
