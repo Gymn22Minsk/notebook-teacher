@@ -348,8 +348,8 @@
 
         /* Обложка Cover-Face элементы */
         .cover-logo {
-            width: 140px;
-            height: 140px;
+            width: 180px;
+            height: 180px;
             background-image: url('logo.png');
             background-size: contain;
             background-repeat: no-repeat;
@@ -787,6 +787,19 @@
             transform: rotate(-15deg);
             z-index: 10;
             pointer-events: none;
+            transition: z-index 0s;
+        }
+        .fountain-pen.writing {
+            animation: penWrite 1.1s ease-in-out;
+            z-index: 200;
+        }
+        @keyframes penWrite {
+            0% { transform: rotate(-15deg) translate(0, 0); }
+            20% { transform: rotate(-30deg) translate(60px, -100px); }
+            40% { transform: rotate(-5deg) translate(160px, -40px); }
+            60% { transform: rotate(-35deg) translate(260px, -110px); }
+            80% { transform: rotate(-10deg) translate(360px, -60px); }
+            100% { transform: rotate(-15deg) translate(0, 0); }
         }
         .fountain-pen::before {
             content: '';
@@ -799,6 +812,15 @@
             border-left: 7px solid transparent;
             border-right: 7px solid transparent;
             border-top: 22px solid #d4af37; /* Латунное перо */
+        }
+        
+        /* След чернил */
+        .ink-trail.visible {
+            opacity: 1;
+        }
+        .ink-trail.visible .ink-path {
+            stroke-dashoffset: 0;
+            transition: stroke-dashoffset 1s ease-out 0.1s;
         }
 
         @keyframes slideDown {
@@ -999,7 +1021,12 @@
     <div class="desk-surface"></div>
 
     <!-- Элегантное перо на столе -->
-    <div class="fountain-pen"></div>
+    <div class="fountain-pen" id="fountainPen"></div>
+    
+    <!-- След чернил при письме -->
+    <svg class="ink-trail" id="inkTrail" viewBox="0 0 1200 900" preserveAspectRatio="none" style="position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:5; opacity:0; transition: opacity 0.4s ease;">
+        <path class="ink-path" d="M 180 700 C 300 500, 450 550, 550 480 C 650 410, 750 500, 900 450" fill="none" stroke="rgba(43, 30, 20, 0.08)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke-dasharray: 800; stroke-dashoffset: 800; transition: stroke-dashoffset 0s;"/>
+    </svg>
 
     <!-- Замочек входа в режим автора -->
     <div class="admin-lock" id="adminLock" onclick="toggleAdminMode()" title="Режим редактирования блокнота">
@@ -2985,9 +3012,28 @@
             updateNavigationUI();
         }
 
+        // Анимация пера при перелистывании
+        function animatePen() {
+            const pen = document.getElementById('fountainPen');
+            const trail = document.getElementById('inkTrail');
+            if (!pen || !trail) return;
+            
+            pen.classList.remove('writing');
+            trail.classList.remove('visible');
+            void pen.offsetWidth;
+            
+            pen.classList.add('writing');
+            trail.classList.add('visible');
+            
+            setTimeout(() => {
+                trail.classList.remove('visible');
+            }, 1600);
+        }
+
         function nextSpread() {
             if (currentSpread >= totalSpreads || isAnimating) return;
             isAnimating = true;
+            animatePen();
             playFlipSound();
 
             const sheets = document.querySelectorAll('.page-sheet');
@@ -3007,6 +3053,7 @@
         function prevSpread() {
             if (currentSpread <= 0 || isAnimating) return;
             isAnimating = true;
+            animatePen();
             playFlipSound();
 
             currentSpread--;
@@ -3027,6 +3074,7 @@
             if (spread < 0 || spread > totalSpreads || isAnimating) return;
             if (spread === currentSpread) return;
             isAnimating = true;
+            animatePen();
             playFlipSound();
 
             const sheets = document.querySelectorAll('.page-sheet');
@@ -3069,6 +3117,7 @@
         function goToHome() {
             if (currentSpread === 0 || isAnimating) return;
             isAnimating = true;
+            animatePen();
             playFlipSound();
 
             const sheets = document.querySelectorAll('.page-sheet');
@@ -3522,6 +3571,9 @@
             applySpread();
             loadNotes();
             renderAllFilesLists();
+            
+            // Анимация пера при первом открытии блокнота
+            setTimeout(animatePen, 1200);
         }).catch(err => {
             console.error("Database initialization failed", err);
             // Fallback
@@ -3530,6 +3582,8 @@
             applySpread();
             loadNotes();
             renderAllFilesLists();
+            
+            setTimeout(animatePen, 1200);
         });
     </script>
 
