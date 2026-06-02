@@ -8,7 +8,14 @@
     <!-- Firebase Scripts (compat версии для обычного <script>) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+
+    <!-- Supabase настройки (ВСТАВЬТЕ СВОИ ДАННЫЕ НИЖЕ) -->
+    <script>
+        // ЗАМЕНИТЕ ЭТИ ДВЕ СТРОКИ НА СВОИ ИЗ SUPABASE (Шаг 6 инструкции):
+        const SUPABASE_URL = 'https://ВАШ-ПРОЕКТ.supabase.co';
+        const SUPABASE_ANON_KEY = 'ВАШ-ANON-KEY';
+        const SUPABASE_BUCKET = 'documents';
+    </script>
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -2205,33 +2212,91 @@
             }
         }
 
-        // Загрузить файл на Firebase (Firestore с base64)
-        async function uploadFileToFirebase(fileObj) {
+        // Вспомогательная функция: base64 → Blob
+        function base64ToBlob(base64, contentType = '') {
+            const byteCharacters = atob(base64);
+            const byteArrays = [];
+            for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+                const slice = byteCharacters.slice(offset, offset + 512);
+                const byteNumbers = new Array(slice.length);
+                for (let i = 0; i < slice.length; i++) byteNumbers[i] = slice.charCodeAt(i);
+                byteArrays.push(new Uint8Array(byteNumbers));
+            }
+            return new Blob(byteArrays, { type: contentType });
+        }
+
+        // Загрузить файл в Supabase Storage + метаданные в Firestore
+        async function uploadFileToSupabase(fileObj) {
             if (!isFirebaseReady) {
                 console.warn("⚠️ Firebase не готов");
                 return false;
             }
             
             try {
-                await firebaseDb.collection("documents").doc(fileObj.name).set(fileObj);
-                console.log(`✅ "${fileObj.name}" загружен на Firebase`);
+                // 1. Конвертируем base64 в Blob и загружаем в Supabase
+                const blob = base64ToBlob(fileObj.base64, fileObj.fileType || 'application/octet-stream');
+                const uploadUrl = `${SUPABASE_URL}/storage/v1/object/${SUPABASE_BUCKET}/${encodeURIComponent(fileObj.name)}`;
+                
+                const response = await fetch(uploadUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': fileObj.fileType || 'application/octet-stream'
+                    },
+                    body: blob
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Supabase upload failed: ${response.status}`);
+                }
+                
+                // 2. Формируем публичный URL
+                const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${encodeURIComponent(fileObj.name)}`;
+                
+                // 3. Сохраняем метаданные в Firestore (без base64!)
+                const docData = {
+                    name: fileObj.name,
+                    url: publicUrl,
+                    type: fileObj.fileType,
+                    sectionId: fileObj.sectionId,
+                    subfolderId: fileObj.subfolderId || '',
+                    size: fileObj.size,
+                    uploadedAt: new Date().toISOString()
+                };
+                await firebaseDb.collection("documents").doc(fileObj.name).set(docData);
+                
+                // 4. Обновляем локальные данные
+                activeCustomDocuments[fileObj.name] = docData;
+                localUploadedDocs[fileObj.name] = docData;
+                await saveDocToDB(fileObj.name, docData);
+                
+                console.log(`✅ "${fileObj.name}" загружен в Supabase: ${publicUrl}`);
                 return true;
             } catch (error) {
-                console.error(`❌ Ошибка загрузки на Firebase:`, error);
+                console.error(`❌ Ошибка загрузки в Supabase:`, error);
                 return false;
             }
         }
 
-        // Удалить файл с Firebase
-        async function deleteFileFromFirebase(filename) {
+        // Удалить файл из Supabase Storage + Firestore
+        async function deleteFileFromSupabase(filename) {
             if (!isFirebaseReady) return false;
             
             try {
+                // Удаляем из Supabase
+                const deleteUrl = `${SUPABASE_URL}/storage/v1/object/${SUPABASE_BUCKET}/${encodeURIComponent(filename)}`;
+                await fetch(deleteUrl, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                });
+                
+                // Удаляем метаданные из Firestore
                 await firebaseDb.collection("documents").doc(filename).delete();
-                console.log(`✅ "${filename}" удалён с Firebase`);
+                
+                console.log(`✅ "${filename}" удалён из Supabase`);
                 return true;
             } catch (error) {
-                console.error(`❌ Ошибка удаления:`, error);
+                console.error(`❌ Ошибка удаления из Supabase:`, error);
                 return false;
             }
         }
@@ -3047,92 +3112,20 @@
 
             document.getElementById('docViewerTitle').textContent = filename;
 
-            // PDF — встроенный просмотрщик браузера
-            if (filename.endsWith('.pdf')) {
-                try {
-                    const byteCharacters = atob(fileObj.base64 ? fileObj.base64 : fileObj);
-                    const byteNumbers = new Array(byteCharacters.length);
-                    for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
-                    const byteArray = new Uint8Array(byteNumbers);
-                    const blob = new Blob([byteArray], { type: "application/pdf" });
-                    const blobUrl = URL.createObjectURL(blob);
-                    document.getElementById('docViewerFrame').src = blobUrl;
-                    document.getElementById('docViewerModal').style.display = 'flex';
-                } catch(e) { console.error(e); alert("Ошибка открытия PDF."); }
-                return;
-            }
-
-            // DOCX — конвертация в HTML через mammoth.js
-            if (filename.endsWith('.docx')) {
-                try {
-                    const byteCharacters = atob(fileObj.base64);
-                    const byteNumbers = new Array(byteCharacters.length);
-                    for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
-                    const byteArray = new Uint8Array(byteNumbers);
-                    
-                    mammoth.convertToHtml({ arrayBuffer: byteArray.buffer })
-                        .then(result => {
-                            const html = `
-                                <style>
-                                    body { font-family: 'Montserrat', sans-serif; padding: 30px; color: #1e293b; background: #faf6ee; line-height: 1.7; max-width: 800px; margin: 0 auto; }
-                                    p { margin-bottom: 14px; text-align: justify; }
-                                    table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px; }
-                                    td, th { border: 1px solid #cbd5e1; padding: 10px; text-align: left; }
-                                    th { background: #f1f5f9; font-weight: 600; }
-                                    h1, h2, h3 { font-family: 'Playfair Display', serif; margin: 20px 0 12px; color: #0f172a; }
-                                    ul, ol { margin: 10px 0 10px 20px; }
-                                    li { margin-bottom: 6px; }
-                                    strong { color: #0f172a; }
-                                </style>
-                                ${result.value}
-                            `;
-                            document.getElementById('docViewerFrame').srcdoc = html;
-                            document.getElementById('docViewerModal').style.display = 'flex';
-                        })
-                        .catch(err => {
-                            console.error("Mammoth error:", err);
-                            alert("Не удалось открыть DOCX. Попробуйте скачать файл.");
-                        });
-                } catch(e) { console.error(e); alert("Ошибка обработки DOCX."); }
-                return;
-            }
-
-            // PPTX и остальные — скачивание
-            try {
-                const byteCharacters = atob(fileObj.base64 ? fileObj.base64 : fileObj);
-                const byteNumbers = new Array(byteCharacters.length);
-                for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
-                const byteArray = new Uint8Array(byteNumbers);
-                
-                let mimeType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-                if (filename.endsWith('.doc')) mimeType = "application/msword";
-                
-                const blob = new Blob([byteArray], { type: mimeType });
-                const blobUrl = URL.createObjectURL(blob);
-                
-                const link = document.createElement('a');
-                link.href = blobUrl;
-                link.download = filename;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                // Показываем сообщение в модалке
-                document.getElementById('docViewerFrame').srcdoc = `
-                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; font-family:Montserrat,sans-serif; color:#1e293b; background:#faf6ee;">
-                        <div style="font-size:64px; margin-bottom:20px;">📥</div>
-                        <h2 style="margin-bottom:10px; font-family:'Playfair Display',serif;">Файл загружается</h2>
-                        <p style="color:#475569; font-weight:600;">${filename}</p>
-                        <p style="color:#94a3b8; font-size:14px; margin-top:15px; max-width:400px; text-align:center;">
-                            Откройте загруженный файл в соответствующем приложении.
-                        </p>
-                    </div>
-                `;
+            // Если есть URL из Supabase — открываем через онлайн-просмотрщики
+            if (fileObj.url) {
+                if (filename.endsWith('.pdf')) {
+                    document.getElementById('docViewerFrame').src = fileObj.url;
+                } else {
+                    // Word / PowerPoint — Microsoft Office Online Viewer
+                    document.getElementById('docViewerFrame').src = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileObj.url)}`;
+                }
                 document.getElementById('docViewerModal').style.display = 'flex';
-            } catch(e) {
-                console.error(e);
-                alert("Ошибка скачивания файла.");
+                return;
             }
+            
+            // Fallback для старых файлов с base64 (без URL)
+            alert('Файл ещё не синхронизирован с облаком. Подождите или загрузите заново.');
         }
 
         // НОВОЕ: Закрыть модальное окно просмотра документа
@@ -3226,7 +3219,7 @@
                     
                     // Удаляем с Firebase
                     if (isFirebaseReady) {
-                        await deleteFileFromFirebase(filename);
+                        await deleteFileFromSupabase(filename);
                     }
                     
                     renderAllFilesLists();
@@ -3360,7 +3353,7 @@
 
                     // Загружаем на Firebase
                     if (isFirebaseReady) {
-                        await uploadFileToFirebase(fileObj);
+                        await uploadFileToSupabase(fileObj);
                     } else {
                         console.warn("⚠️ Firebase не готов, файл сохранён только локально");
                     }
