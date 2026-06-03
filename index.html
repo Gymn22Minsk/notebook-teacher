@@ -88,6 +88,7 @@
             transform: translateX(-50%);
             z-index: 1000;
             display: flex;
+            pointer-events: none;
             flex-direction: column;
             justify-content: space-between;
             align-items: center;
@@ -278,6 +279,11 @@
             touch-action: pan-y;
             -webkit-overflow-scrolling: touch;
             transform: translateZ(0);
+        }
+        .page-scroll-content::after {
+            content: '';
+            display: block;
+            height: 1px;
         }
 
         .page-scroll-content::-webkit-scrollbar { width: 4px; }
