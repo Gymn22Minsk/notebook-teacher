@@ -2231,6 +2231,7 @@
         }
 
         // Слушать изменения в реальном времени
+        let firebaseRenderTimeout;
         function listenToFirebaseChanges() {
             try {
                 firebaseDb.collection("documents").onSnapshot(snapshot => {
@@ -2251,8 +2252,11 @@
                         }
                     });
                     
-                    console.log("🔄 Получены обновления из Firebase!");
-                    renderAllFilesLists();
+                    clearTimeout(firebaseRenderTimeout);
+                    firebaseRenderTimeout = setTimeout(() => {
+                        console.log("🔄 Получены обновления из Firebase!");
+                        renderAllFilesLists();
+                    }, 300);
                 });
             } catch (error) {
                 console.warn("⚠️ Реал-тайм синхронизация недоступна");
