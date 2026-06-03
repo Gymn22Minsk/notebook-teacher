@@ -138,6 +138,14 @@
             backface-visibility: hidden;
             box-shadow: 0 10px 35px rgba(0,0,0,0.35);
             border-radius: 4px;
+            pointer-events: auto;
+        }
+        
+        .page-sheet:not(.flipped) .face.back {
+            pointer-events: none;
+        }
+        .page-sheet.flipped .face.front {
+            pointer-events: none;
         }
 
         /* Обложка (кожаная текстура) */
