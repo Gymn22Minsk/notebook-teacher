@@ -88,7 +88,6 @@
             transform: translateX(-50%);
             z-index: 1000;
             display: flex;
-            pointer-events: none;
             flex-direction: column;
             justify-content: space-between;
             align-items: center;
@@ -122,8 +121,6 @@
             transform-origin: left center;
             transform-style: preserve-3d;
             transition: transform 0.9s cubic-bezier(0.645, 0.045, 0.355, 1);
-            will-change: transform;
-            cursor: pointer;
         }
 
         .page-sheet.flipped {
@@ -139,14 +136,6 @@
             backface-visibility: hidden;
             box-shadow: 0 10px 35px rgba(0,0,0,0.35);
             border-radius: 4px;
-            pointer-events: auto;
-        }
-        
-        .page-sheet:not(.flipped) .face.back {
-            pointer-events: none !important;
-        }
-        .page-sheet.flipped .face.front {
-            pointer-events: none !important;
         }
 
         /* Обложка (кожаная текстура) */
@@ -275,14 +264,6 @@
             line-height: 30px;
             color: #334155;
             font-weight: 400;
-            pointer-events: auto;
-            touch-action: pan-y;
-            -webkit-overflow-scrolling: touch;
-        }
-        .page-scroll-content::after {
-            content: '';
-            display: block;
-            height: 1px;
         }
 
         .page-scroll-content::-webkit-scrollbar { width: 4px; }
@@ -3304,26 +3285,7 @@
             });
         }
 
-        // Пассивный wheel на .paper-face чтобы скролл работал даже в padding-зонах
-        document.querySelectorAll('.paper-face').forEach(face => {
-            face.addEventListener('wheel', (e) => {
-                if (e.target.closest('.page-scroll-content')) return;
-                const scrollContent = face.querySelector('.page-scroll-content');
-                if (scrollContent) {
-                    scrollContent.scrollTop += e.deltaY;
-                }
-            }, { passive: true });
-        });
-        
-        // Wheel на .editable-content чтобы прокручивать родительский .page-scroll-content
-        document.querySelectorAll('.editable-content').forEach(editable => {
-            editable.addEventListener('wheel', (e) => {
-                const scrollContent = editable.closest('.page-scroll-content');
-                if (scrollContent) {
-                    scrollContent.scrollTop += e.deltaY;
-                }
-            }, { passive: true });
-        });
+        // (wheel handlers removed — using native scroll)
 
         // === ИНТЕРАКТИВНЫЕ ЗАМЕТКИ ===
         function saveNotes() {
