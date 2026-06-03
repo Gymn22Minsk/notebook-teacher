@@ -2285,7 +2285,7 @@
                 const uploadUrl = `${SUPABASE_URL}/storage/v1/object/${SUPABASE_BUCKET}/${encodeURIComponent(storageName)}`;
                 
                 const response = await fetch(uploadUrl, {
-                    method: 'POST',
+                    method: 'PUT',
                     headers: {
                         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
                         'Content-Type': fileObj.fileType || 'application/octet-stream'
