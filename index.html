@@ -2204,6 +2204,7 @@
         // Загрузить все файлы с Firebase
         async function syncWithFirebase() {
             try {
+                console.log('[syncWithFirebase] Starting sync...');
                 const snapshot = await firebaseDb.collection("documents").get();
                 let count = 0;
                 
@@ -2220,12 +2221,12 @@
                     count++;
                 });
                 
-                console.log(`✅ Синхронизировано ${count} файлов с Firebase`);
+                console.log(`✅ Синхронизировано ${count} файлов с Firebase. Active keys: ${Object.keys(activeCustomDocuments).length}`);
                 isFirebaseReady = true;
                 renderAllFilesLists();
                 
             } catch (error) {
-                console.warn("⚠️ Firebase недоступен (тестовый режим):", error);
+                console.error("⚠️ Firebase sync FAILED:", error);
                 isFirebaseReady = false;
             }
         }
@@ -3268,6 +3269,7 @@
 
         // === ОТРИСОВКА СПИСКОВ ФАЙЛОВ НА СТРАНИЦАХ ===
         function renderAllFilesLists() {
+            let totalFiles = 0;
             document.querySelectorAll('.files-section').forEach(section => {
                 const sectionId = section.dataset.section;
                 const subfolderId = section.dataset.subfolder || "";
@@ -3307,6 +3309,7 @@
                     return a.name.localeCompare(b.name);
                 });
 
+                totalFiles += allFilesForSection.length;
                 if (allFilesForSection.length === 0) {
                     listEl.innerHTML = '<div style="font-size:12px; color:#94a3b8; font-style:italic; padding:6px 0;">Нет доступных материалов</div>';
                 } else {
@@ -3343,6 +3346,7 @@
                     listEl.appendChild(uploadZone);
                 }
             });
+            console.log(`[renderAllFilesLists] total sections rendered, custom docs count: ${Object.keys(activeCustomDocuments).length}, files in lists: ${totalFiles}`);
         }
 
         // Удаление файла (любого: как своего, так и предустановленного)
@@ -3492,6 +3496,7 @@
                     await saveDocToDB(file.name, fileObj);
 
                     // Загружаем на Firebase
+                    console.log(`[upload] ${file.name} - isFirebaseReady=${isFirebaseReady}`);
                     if (isFirebaseReady) {
                         await uploadFileToSupabase(fileObj);
                     } else {
@@ -3595,6 +3600,7 @@
 
         // === СТАРТ ПРИЛОЖЕНИЯ ===
         initDB().then(async () => {
+            console.log('[init] DB ready, starting Firebase sync...');
             // Синхронизируемся с Firebase
             await syncWithFirebase();
             listenToFirebaseChanges();
