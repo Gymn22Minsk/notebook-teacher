@@ -2264,6 +2264,86 @@
             }
         }
 
+        // === СИНХРОНИЗАЦИЯ ПАПОК ЧЕРЕЗ FIREBASE ===
+        async function syncFoldersWithFirebase() {
+            try {
+                // Сначала загружаем папки из Firebase
+                const snapshot = await firebaseDb.collection("folders").get();
+                snapshot.forEach(doc => {
+                    const folder = doc.data();
+                    if (!activeFolders.find(f => f.id === folder.id)) {
+                        activeFolders.push(folder);
+                        localFolders.push(folder);
+                    }
+                });
+                
+                // Затем сохраняем локальные папки, которых ещё нет в Firebase
+                if (isFirebaseReady) {
+                    for (const folder of localFolders) {
+                        const doc = await firebaseDb.collection("folders").doc(folder.id).get();
+                        if (!doc.exists) {
+                            await firebaseDb.collection("folders").doc(folder.id).set(folder);
+                        }
+                    }
+                }
+                
+                localStorage.setItem('local_teacher_notebook_folders', JSON.stringify(localFolders));
+                console.log(`✅ Синхронизировано ${snapshot.size} папок с Firebase, локальных: ${localFolders.length}`);
+            } catch (error) {
+                console.error("⚠️ Firebase folders sync FAILED:", error);
+            }
+        }
+
+        async function saveFolderToFirebase(folder) {
+            if (!isFirebaseReady) return;
+            try {
+                await firebaseDb.collection("folders").doc(folder.id).set(folder);
+            } catch (e) {
+                console.error("Failed to save folder to Firebase:", e);
+            }
+        }
+
+        async function deleteFolderFromFirebase(folderId) {
+            if (!isFirebaseReady) return;
+            try {
+                await firebaseDb.collection("folders").doc(folderId).delete();
+            } catch (e) {
+                console.error("Failed to delete folder from Firebase:", e);
+            }
+        }
+
+        let firebaseFolderRenderTimeout;
+        function listenToFirebaseFolderChanges() {
+            try {
+                firebaseDb.collection("folders").onSnapshot(snapshot => {
+                    snapshot.docChanges().forEach(change => {
+                        const folder = change.doc.data();
+                        if (change.type === 'removed') {
+                            const idx = activeFolders.findIndex(f => f.id === folder.id);
+                            if (idx > -1) activeFolders.splice(idx, 1);
+                            localFolders = localFolders.filter(f => f.id !== folder.id);
+                        } else {
+                            if (!activeFolders.find(f => f.id === folder.id)) {
+                                activeFolders.push(folder);
+                                localFolders.push(folder);
+                            }
+                        }
+                    });
+                    localStorage.setItem('local_teacher_notebook_folders', JSON.stringify(localFolders));
+                    
+                    clearTimeout(firebaseFolderRenderTimeout);
+                    firebaseFolderRenderTimeout = setTimeout(() => {
+                        console.log("🔄 Получены обновления папок из Firebase!");
+                        createPages();
+                        applySpread();
+                        renderAllFilesLists();
+                    }, 300);
+                });
+            } catch (error) {
+                console.warn("⚠️ Реал-тайм синхронизация папок недоступна");
+            }
+        }
+
         // Вспомогательная функция: base64 → Blob
         function base64ToBlob(base64, contentType = '') {
             const byteCharacters = atob(base64);
@@ -3381,17 +3461,16 @@
             if (!folderName) return;
             const folderId = "folder_" + Date.now();
             
-            localFolders.push({
+            const newFolder = {
                 id: folderId,
                 label: folderName,
                 sectionId: sectionId
-            });
+            };
+            localFolders.push(newFolder);
             localStorage.setItem('local_teacher_notebook_folders', JSON.stringify(localFolders));
-            activeFolders.push({
-                id: folderId,
-                label: folderName,
-                sectionId: sectionId
-            });
+            activeFolders.push(newFolder);
+            
+            saveFolderToFirebase(newFolder);
 
             // Перерисовываем и рендерим
             createPages();
@@ -3409,6 +3488,8 @@
                 
                 const activeIndex = activeFolders.findIndex(f => f.id === folderId);
                 if (activeIndex > -1) activeFolders.splice(activeIndex, 1);
+                
+                deleteFolderFromFirebase(folderId);
 
                 // Удаляем файлы из этой папки
                 const deletePromises = [];
@@ -3417,6 +3498,7 @@
                         delete activeCustomDocuments[filename];
                         delete localUploadedDocs[filename];
                         deletePromises.push(deleteDocFromDB(filename));
+                        if (isFirebaseReady) deletePromises.push(deleteFileFromSupabase(filename));
                     }
                 });
 
@@ -3604,6 +3686,8 @@
             // Синхронизируемся с Firebase
             await syncWithFirebase();
             listenToFirebaseChanges();
+            await syncFoldersWithFirebase();
+            listenToFirebaseFolderChanges();
             
             // Читаем загруженные документы из IndexedDB и объединяем
             const dbDocs = await getDocsFromDB();
