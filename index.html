@@ -3314,6 +3314,16 @@
                 }
             }, { passive: true });
         });
+        
+        // Wheel на .editable-content чтобы прокручивать родительский .page-scroll-content
+        document.querySelectorAll('.editable-content').forEach(editable => {
+            editable.addEventListener('wheel', (e) => {
+                const scrollContent = editable.closest('.page-scroll-content');
+                if (scrollContent) {
+                    scrollContent.scrollTop += e.deltaY;
+                }
+            }, { passive: true });
+        });
 
         // === ИНТЕРАКТИВНЫЕ ЗАМЕТКИ ===
         function saveNotes() {
