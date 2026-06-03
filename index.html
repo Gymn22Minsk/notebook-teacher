@@ -127,6 +127,7 @@
 
         .page-sheet.flipped {
             transform: rotateY(-180deg);
+            pointer-events: none;
         }
 
         .face {
@@ -266,6 +267,10 @@
             line-height: 30px;
             color: #334155;
             font-weight: 400;
+            pointer-events: auto;
+            touch-action: pan-y;
+            -webkit-overflow-scrolling: touch;
+            transform: translateZ(0);
         }
 
         .page-scroll-content::-webkit-scrollbar { width: 4px; }
@@ -3280,6 +3285,17 @@
                 el.scrollTop = 0;
             });
         }
+
+        // Пассивный wheel на .paper-face чтобы скролл работал даже в padding-зонах
+        document.querySelectorAll('.paper-face').forEach(face => {
+            face.addEventListener('wheel', (e) => {
+                if (e.target.closest('.page-scroll-content')) return;
+                const scrollContent = face.querySelector('.page-scroll-content');
+                if (scrollContent) {
+                    scrollContent.scrollTop += e.deltaY;
+                }
+            }, { passive: true });
+        });
 
         // === ИНТЕРАКТИВНЫЕ ЗАМЕТКИ ===
         function saveNotes() {
