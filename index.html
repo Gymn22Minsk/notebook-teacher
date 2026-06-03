@@ -21,6 +21,10 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
+        html, body {
+            overflow: hidden;
+        }
+        
         body {
             background: #150d0a;
             background-image: 
@@ -3161,6 +3165,42 @@
                 e.preventDefault();
                 prevSpread();
             }
+        });
+
+        // Прокрутка страниц колёсиком мыши
+        document.querySelectorAll('.paper-face').forEach(face => {
+            face.addEventListener('wheel', (e) => {
+                const scrollContent = face.querySelector('.page-scroll-content');
+                if (!scrollContent) return;
+                
+                // Если курсор внутри .page-scroll-content и есть куда скроллить — даём стандартной прокрутке работать
+                if (e.target.closest('.page-scroll-content')) {
+                    const canScrollDown = scrollContent.scrollTop + scrollContent.clientHeight < scrollContent.scrollHeight;
+                    const canScrollUp = scrollContent.scrollTop > 0;
+                    
+                    if ((e.deltaY > 0 && canScrollDown) || (e.deltaY < 0 && canScrollUp)) {
+                        return;
+                    }
+                }
+                
+                e.preventDefault();
+                
+                const canScrollDown = scrollContent.scrollTop + scrollContent.clientHeight < scrollContent.scrollHeight;
+                const canScrollUp = scrollContent.scrollTop > 0;
+                
+                if (e.deltaY > 0 && canScrollDown) {
+                    scrollContent.scrollTop += e.deltaY;
+                } else if (e.deltaY < 0 && canScrollUp) {
+                    scrollContent.scrollTop += e.deltaY;
+                } else {
+                    // Достигли края — перелистываем страницу
+                    if (e.deltaY > 0) {
+                        nextSpread();
+                    } else {
+                        prevSpread();
+                    }
+                }
+            }, { passive: false });
         });
 
         // === ИНТЕРАКТИВНЫЕ ЗАМЕТКИ ===
