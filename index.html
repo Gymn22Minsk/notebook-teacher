@@ -2210,6 +2210,12 @@
                 snapshot.forEach(doc => {
                     const fileObj = doc.data();
                     activeCustomDocuments[fileObj.name] = fileObj;
+                    
+                    // Сохраняем в IndexedDB, но не теряем base64 если он есть локально
+                    const localData = localUploadedDocs[fileObj.name];
+                    if (localData && localData.base64) {
+                        fileObj.base64 = localData.base64;
+                    }
                     saveDocToDB(fileObj.name, fileObj);
                     count++;
                 });
@@ -2228,9 +2234,21 @@
         function listenToFirebaseChanges() {
             try {
                 firebaseDb.collection("documents").onSnapshot(snapshot => {
-                    snapshot.forEach(doc => {
-                        const fileObj = doc.data();
-                        activeCustomDocuments[fileObj.name] = fileObj;
+                    snapshot.docChanges().forEach(change => {
+                        const fileObj = change.doc.data();
+                        if (change.type === 'removed') {
+                            delete activeCustomDocuments[fileObj.name];
+                            delete localUploadedDocs[fileObj.name];
+                            deleteDocFromDB(fileObj.name);
+                        } else {
+                            activeCustomDocuments[fileObj.name] = fileObj;
+                            // Сохраняем в IndexedDB, сохраняя base64
+                            const localData = localUploadedDocs[fileObj.name];
+                            if (localData && localData.base64) {
+                                fileObj.base64 = localData.base64;
+                            }
+                            saveDocToDB(fileObj.name, fileObj);
+                        }
                     });
                     
                     console.log("🔄 Получены обновления из Firebase!");
@@ -3167,40 +3185,20 @@
             }
         });
 
-        // Прокрутка страниц колёсиком мыши
-        document.querySelectorAll('.paper-face').forEach(face => {
-            face.addEventListener('wheel', (e) => {
-                const scrollContent = face.querySelector('.page-scroll-content');
-                if (!scrollContent) return;
-                
-                // Если курсор внутри .page-scroll-content и есть куда скроллить — даём стандартной прокрутке работать
-                if (e.target.closest('.page-scroll-content')) {
-                    const canScrollDown = scrollContent.scrollTop + scrollContent.clientHeight < scrollContent.scrollHeight;
-                    const canScrollUp = scrollContent.scrollTop > 0;
-                    
-                    if ((e.deltaY > 0 && canScrollDown) || (e.deltaY < 0 && canScrollUp)) {
-                        return;
-                    }
-                }
-                
-                e.preventDefault();
-                
-                const canScrollDown = scrollContent.scrollTop + scrollContent.clientHeight < scrollContent.scrollHeight;
-                const canScrollUp = scrollContent.scrollTop > 0;
-                
-                if (e.deltaY > 0 && canScrollDown) {
-                    scrollContent.scrollTop += e.deltaY;
-                } else if (e.deltaY < 0 && canScrollUp) {
-                    scrollContent.scrollTop += e.deltaY;
-                } else {
-                    // Достигли края — перелистываем страницу
-                    if (e.deltaY > 0) {
-                        nextSpread();
-                    } else {
-                        prevSpread();
-                    }
-                }
-            }, { passive: false });
+        // Прокрутка страниц колёсиком мыши (перелистывание)
+        document.addEventListener('wheel', (e) => {
+            // Не перехватываем, если курсор внутри прокручиваемого контента или модального окна
+            if (e.target.closest('.page-scroll-content')) return;
+            if (e.target.closest('#docViewerModal')) return;
+            
+            const scene = e.target.closest('.scene');
+            if (!scene) return;
+            
+            if (e.deltaY > 0) {
+                nextSpread();
+            } else if (e.deltaY < 0) {
+                prevSpread();
+            }
         });
 
         // === ИНТЕРАКТИВНЫЕ ЗАМЕТКИ ===
@@ -3592,14 +3590,14 @@
         }
 
         // === СТАРТ ПРИЛОЖЕНИЯ ===
-        initDB().then(() => {
+        initDB().then(async () => {
             // Синхронизируемся с Firebase
-            syncWithFirebase();
+            await syncWithFirebase();
             listenToFirebaseChanges();
             
             // Читаем загруженные документы из IndexedDB и объединяем
-            return getDocsFromDB();
-        }).then(dbDocs => {
+            const dbDocs = await getDocsFromDB();
+            
             Object.keys(dbDocs).forEach(filename => {
                 activeCustomDocuments[filename] = dbDocs[filename];
                 localUploadedDocs[filename] = dbDocs[filename];
