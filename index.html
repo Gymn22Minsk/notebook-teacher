@@ -143,10 +143,10 @@
         }
         
         .page-sheet:not(.flipped) .face.back {
-            pointer-events: none;
+            pointer-events: none !important;
         }
         .page-sheet.flipped .face.front {
-            pointer-events: none;
+            pointer-events: none !important;
         }
 
         /* Обложка (кожаная текстура) */
@@ -278,7 +278,6 @@
             pointer-events: auto;
             touch-action: pan-y;
             -webkit-overflow-scrolling: touch;
-            transform: translateZ(0);
         }
         .page-scroll-content::after {
             content: '';
