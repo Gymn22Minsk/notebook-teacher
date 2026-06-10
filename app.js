@@ -408,11 +408,11 @@
 
         // Список разделов блокнота
         const SECTIONS = [
-            { id: "vneklass", spread: 1 },
-            { id: "didaktika", spread: 2 },
+            { id: "didaktika", spread: 1 },
             { id: "mej_den", spread: 2 },
-            { id: "ssylki", spread: 3 },
+            { id: "ssylki", spread: 2 },
             { id: "pisateli", spread: 3 },
+            { id: "vneklass", spread: 3 },
             { id: "reading", spread: 4 },
             { id: "soveti", spread: 4 },
             { id: "russkiy_jaz", spread: 5 },
@@ -427,6 +427,8 @@
                 type: 'cover',
                 front: {
                     html: `
+                        <div style="font-family:'Playfair Display', serif; font-size:15px; color:#c5a880; letter-spacing:1px; text-align:center; margin-bottom:8px; text-transform:uppercase;">ГУО «Гимназия № 22 г.Минска»</div>
+                        <div style="font-family:'Montserrat', sans-serif; font-size:12px; color:rgba(255,255,255,0.5); letter-spacing:2px; text-align:center; margin-bottom:16px; text-transform:uppercase;">Ресурсный центр по русскому языку</div>
                         <div class="cover-logo"></div>
                         <div class="cover-title">Блокнот</div>
                         <div class="cover-title" style="font-size:26px; color:#d4af37;">молодого учителя</div>
@@ -441,19 +443,19 @@
                         <p style="margin-bottom:18px;">В этом блокноте собраны ключевые материалы, шаблоны рабочих документов в соответствии с требованиями образования РБ и полезные советы для организации учебного процесса:</p>
                         <div class="toc-list">
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(1)">
-                                <span>1. Внеклассные мероприятия</span><span class="toc-dots"></span><span class="toc-page">стр. 3</span>
+                                <span>1. Дидактические материалы</span><span class="toc-dots"></span><span class="toc-page">стр. 3</span>
                             </div>
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(2)">
-                                <span>2. Дидактические материалы</span><span class="toc-dots"></span><span class="toc-page">стр. 4</span>
+                                <span>2. Международный день на уроке</span><span class="toc-dots"></span><span class="toc-page">стр. 4</span>
                             </div>
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(2)">
-                                <span>3. Международный день на уроке</span><span class="toc-dots"></span><span class="toc-page">стр. 5</span>
+                                <span>3. Полезные ссылки</span><span class="toc-dots"></span><span class="toc-page">стр. 5</span>
                             </div>
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(3)">
-                                <span>4. Полезные ссылки</span><span class="toc-dots"></span><span class="toc-page">стр. 6</span>
+                                <span>4. Русские писатели на уроке</span><span class="toc-dots"></span><span class="toc-page">стр. 6</span>
                             </div>
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(3)">
-                                <span>5. Русские писатели на уроке</span><span class="toc-dots"></span><span class="toc-page">стр. 7</span>
+                                <span>5. Внеклассные мероприятия</span><span class="toc-dots"></span><span class="toc-page">стр. 7</span>
                             </div>
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(4)">
                                 <span>6. Советуем прочитать</span><span class="toc-dots"></span><span class="toc-page">стр. 8</span>
@@ -481,23 +483,8 @@
             {
                 type: 'paper',
                 front: {
-                    sectionId: "vneklass",
-                    title: "1. Внеклассные мероприятия",
-                    html: `
-                        <p>Воспитательная и внеклассная работа в учреждениях общего среднего образования Республики Беларусь опирается на Программу непрерывного воспитания детей и учащейся молодежи.</p>
-                        <div class="quote-box">«Ученик — это не сосуд, который нужно заполнить, а факел, который нужно зажечь».<br><span style="font-size:18px; font-weight:600;">— Плутарх</span></div>
-                        <p><strong>Чек-лист классных дел на четверть:</strong></p>
-                        <ul class="todo-list">
-                            <li>Определить темы классных и обязательных информационных часов</li>
-                            <li>Провести анкетирование увлечений и кружков</li>
-                            <li>Выбрать актив класса (староста, физорг, сектор правопорядка)</li>
-                            <li>Спланировать посещение знаковых мест Беларуси (экскурсионная программа)</li>
-                        </ul>
-                    `
-                },
-                back: {
                     sectionId: "didaktika",
-                    title: "2. Дидактические материалы",
+                    title: "1. Дидактические материалы",
                     html: `
                         <p>Раздаточные и дидактические материалы позволяют индивидуализировать обучение и организовать самостоятельную работу учащихся. Разработка карточек должна учитывать 10-балльную систему оценки результатов учебной деятельности.</p>
                         <p><strong>Уровни усвоения учебного материала в школах РБ (для карточек):</strong></p>
@@ -507,14 +494,10 @@
                             <li><strong>IV-V уровни (7–10 баллов)</strong> — Творческое применение знаний.</li>
                         </ul>
                     `
-                }
-            },
-            // Sheet 2 (Раздел 3 и Раздел 4)
-            {
-                type: 'paper',
-                front: {
+                },
+                back: {
                     sectionId: "mej_den",
-                    title: "3. Международный день на уроке русского",
+                    title: "2. Международный день на уроке русского",
                     html: `
                         <p>Интеграция крупных праздников в учебный процесс способствует формированию социокультурной компетенции школьников и уважению к языковому разнообразию Республики Беларусь.</p>
                         <p><strong>Календарь важных дат для уроков словесности:</strong></p>
@@ -527,10 +510,14 @@
                         <p><strong>Идеи активностей на уроке:</strong><br>
                         Сравнительно-лингвистический анализ схожих белорусских и русских фразеологизмов, исторический диктант «Путь Скорины».</p>
                     `
-                },
-                back: {
+                }
+            },
+            // Sheet 2 (Раздел 3 и Раздел 4)
+            {
+                type: 'paper',
+                front: {
                     sectionId: "ssylki",
-                    title: "4. Полезные ссылки для словесника",
+                    title: "3. Полезные ссылки для словесника",
                     html: `
                         <p>Официальные интернет-ресурсы, порталы и базы данных Министерства образования Республики Беларусь, необходимые для ежедневной работы педагога:</p>
                         
@@ -560,19 +547,34 @@
                             ⚠️ Портал "Adu.by" — ваш главный источник актуальных учебных программ и инструктивно-методических писем на текущий учебный год!
                         </div>
                     `
+                },
+                back: {
+                    sectionId: "pisateli",
+                    title: "4. Русские писатели на уроке русского",
+                    html: `
+                        <p>Изучение сложных тем грамматики и синтаксиса на живых классических текстах воспитывает безупречное языковое чутьё и культуру чтения.</p>
+                        <div class="quote-box">«Берегите наш язык, наш прекрасный русский язык — это клад, это достояние, переданное нам нашими предшественниками!»<br><span style="font-size:18px; font-weight:600;">— И. С. Тургенев</span></div>
+                        <p><strong>Межпредметные лингвистические связи:</strong></p>
+                        <p>• <i>Лингвокультурология:</i> Анализ текстов русских классиков, живших или путешествовавших по Беларуси (например, пребывание А.С. Пушкина в Могилеве и Минске, творчество И.С. Тургенева, Н.А. Некрасова).</p>
+                    `
                 }
             },
             // Sheet 3 (Раздел 5 и Раздел 6)
             {
                 type: 'paper',
                 front: {
-                    sectionId: "pisateli",
-                    title: "5. Русские писатели на уроке русского",
+                    sectionId: "vneklass",
+                    title: "5. Внеклассные мероприятия",
                     html: `
-                        <p>Изучение сложных тем грамматики и синтаксиса на живых классических текстах воспитывает безупречное языковое чутьё и культуру чтения.</p>
-                        <div class="quote-box">«Берегите наш язык, наш прекрасный русский язык — это клад, это достояние, переданное нам нашими предшественниками!»<br><span style="font-size:18px; font-weight:600;">— И. С. Тургенев</span></div>
-                        <p><strong>Межпредметные лингвистические связи:</strong></p>
-                        <p>• <i>Лингвокультурология:</i> Анализ текстов русских классиков, живших или путешествовавших по Беларуси (например, пребывание А.С. Пушкина в Могилеве и Минске, творчество И.С. Тургенева, Н.А. Некрасова).</p>
+                        <p>Воспитательная и внеклассная работа в учреждениях общего среднего образования Республики Беларусь опирается на Программу непрерывного воспитания детей и учащейся молодежи.</p>
+                        <div class="quote-box">«Ученик — это не сосуд, который нужно заполнить, а факел, который нужно зажечь».<br><span style="font-size:18px; font-weight:600;">— Плутарх</span></div>
+                        <p><strong>Чек-лист классных дел на четверть:</strong></p>
+                        <ul class="todo-list">
+                            <li>Определить темы классных и обязательных информационных часов</li>
+                            <li>Провести анкетирование увлечений и кружков</li>
+                            <li>Выбрать актив класса (староста, физорг, сектор правопорядка)</li>
+                            <li>Спланировать посещение знаковых мест Беларуси (экскурсионная программа)</li>
+                        </ul>
                     `
                 },
                 back: {
