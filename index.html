@@ -468,7 +468,7 @@
         .doc-card-icon {
             width: 34px;
             height: 34px;
-            background-color: #2b5797;
+            background-color: #7f8c8d;
             color: white;
             font-family: sans-serif;
             font-weight: 900;
@@ -480,6 +480,11 @@
             margin-right: 12px;
             flex-shrink: 0;
         }
+        .doc-card-icon.docx { background-color: #2b5797; }
+        .doc-card-icon.doc { background-color: #2b5797; }
+        .doc-card-icon.pptx { background-color: #d35400; }
+        .doc-card-icon.ppt { background-color: #d35400; }
+        .doc-card-icon.pdf { background-color: #c0392b; }
 
         .doc-card-info {
             flex: 1;
@@ -3349,6 +3354,23 @@
         }
 
         // === ОТРИСОВКА СПИСКОВ ФАЙЛОВ НА СТРАНИЦАХ ===
+        
+        function getFileIconClass(filename) {
+            const lower = filename.toLowerCase();
+            if (lower.endsWith('.pdf')) return 'pdf';
+            if (lower.endsWith('.pptx') || lower.endsWith('.ppt')) return 'pptx';
+            if (lower.endsWith('.docx') || lower.endsWith('.doc')) return 'docx';
+            return '';
+        }
+        
+        function getFileIconText(filename) {
+            const lower = filename.toLowerCase();
+            if (lower.endsWith('.pdf')) return 'PDF';
+            if (lower.endsWith('.pptx') || lower.endsWith('.ppt')) return 'PPTX';
+            if (lower.endsWith('.docx') || lower.endsWith('.doc')) return 'DOCX';
+            return 'FILE';
+        }
+        
         function renderAllFilesLists() {
             let totalFiles = 0;
             document.querySelectorAll('.files-section').forEach(section => {
@@ -3401,8 +3423,11 @@
                         
                         const card = document.createElement('div');
                         card.className = 'doc-card';
+                        const iconClass = getFileIconClass(filename);
+                        const iconText = getFileIconText(filename);
+                        
                         card.innerHTML = `
-                            <div class="doc-card-icon">DOCX</div>
+                            <div class="doc-card-icon ${iconClass}">${iconText}</div>
                             <div class="doc-card-info" onclick="event.stopPropagation(); openFile('${filename}')" style="cursor:pointer;">
                                 <div class="doc-card-name" title="${filename}">${filename}</div>
                                 <div class="doc-card-size">${sizeText}</div>
