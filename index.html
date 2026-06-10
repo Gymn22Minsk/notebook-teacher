@@ -11,7 +11,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Конфигурация облачных сервисов (в .gitignore) -->
-    <script src="config.js"></script>
+    <script src="config.js" onerror="console.log('[config] Локальный config.js не найден, используется fallback')"></script>
     
     <link rel="stylesheet" href="styles.css">
 </head>
