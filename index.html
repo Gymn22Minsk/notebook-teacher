@@ -1173,7 +1173,25 @@
         <button class="nav-btn" id="nextBtn" onclick="nextSpread()">Вперед →</button>
     </div>
 
+    <!-- Fallback конфигурация (переопределяется config.js, если он существует) -->
+    <script>
+        if (typeof firebaseConfig === 'undefined') {
+            window.firebaseConfig = {
+                apiKey: "PLACEHOLDER",
+                authDomain: "notebook-teacher.firebaseapp.com",
+                projectId: "notebook-teacher",
+                storageBucket: "notebook-teacher.firebasestorage.app",
+                messagingSenderId: "00000000000",
+                appId: "1:00000000000:web:0000000000000000000000",
+                measurementId: "G-0000000000"
+            };
+        }
+        if (typeof SUPABASE_URL === 'undefined') {
+            window.SUPABASE_URL = '';
+            window.SUPABASE_ANON_KEY = '';
+            window.SUPABASE_BUCKET = 'documents';
+        }
+    </script>
     <script src="app.js"></script>
-
 
 </body></html>

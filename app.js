@@ -1,15 +1,29 @@
         // ===== FIREBASE ИНИЦИАЛИЗАЦИЯ =====
-        // Конфигурация загружается из config.js
-        firebase.initializeApp(firebaseConfig);
-        const firebaseDb = firebase.firestore();
+        // Конфигурация загружается из config.js или fallback в index.html
+        let firebaseDb = null;
         let isFirebaseReady = false;
         
-        console.log("✅ Firebase инициализирован!");
+        if (typeof firebase !== 'undefined' && firebaseConfig && firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PLACEHOLDER') {
+            try {
+                firebase.initializeApp(firebaseConfig);
+                firebaseDb = firebase.firestore();
+                isFirebaseReady = true;
+                console.log("✅ Firebase инициализирован!");
+            } catch (e) {
+                console.warn("⚠️ Firebase init failed:", e);
+            }
+        } else {
+            console.warn("⚠️ Firebase не настроен. Работа в офлайн-режиме.");
+        }
 
         // ===== ФУНКЦИИ СИНХРОНИЗАЦИИ С FIREBASE =====
 
         // Загрузить все файлы с Firebase
         async function syncWithFirebase() {
+            if (!firebaseDb) {
+                console.warn('[syncWithFirebase] firebaseDb не инициализирован, пропускаем');
+                return;
+            }
             try {
                 console.log('[syncWithFirebase] Starting sync...');
                 const snapshot = await firebaseDb.collection("documents").get();
@@ -41,6 +55,7 @@
         // Слушать изменения в реальном времени
         let firebaseRenderTimeout;
         function listenToFirebaseChanges() {
+            if (!firebaseDb) return;
             try {
                 firebaseDb.collection("documents").onSnapshot(snapshot => {
                     snapshot.docChanges().forEach(change => {
@@ -73,6 +88,7 @@
 
         // === СИНХРОНИЗАЦИЯ ПАПОК ЧЕРЕЗ FIREBASE ===
         async function syncFoldersWithFirebase() {
+            if (!firebaseDb) return;
             try {
                 // Сначала загружаем папки из Firebase
                 const snapshot = await firebaseDb.collection("folders").get();
@@ -102,7 +118,7 @@
         }
 
         async function saveFolderToFirebase(folder) {
-            if (!isFirebaseReady) return;
+            if (!isFirebaseReady || !firebaseDb) return;
             try {
                 await firebaseDb.collection("folders").doc(folder.id).set(folder);
             } catch (e) {
@@ -111,7 +127,7 @@
         }
 
         async function deleteFolderFromFirebase(folderId) {
-            if (!isFirebaseReady) return;
+            if (!isFirebaseReady || !firebaseDb) return;
             try {
                 await firebaseDb.collection("folders").doc(folderId).delete();
             } catch (e) {
@@ -121,6 +137,7 @@
 
         let firebaseFolderRenderTimeout;
         function listenToFirebaseFolderChanges() {
+            if (!firebaseDb) return;
             try {
                 firebaseDb.collection("folders").onSnapshot(snapshot => {
                     snapshot.docChanges().forEach(change => {
@@ -189,6 +206,10 @@
                 console.warn("⚠️ Firebase не готов");
                 return false;
             }
+            if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+                console.warn("⚠️ Supabase не настроен");
+                return false;
+            }
             
             try {
                 // 1. Создаём безопасное имя для Supabase
@@ -246,6 +267,10 @@
         // Удалить файл из Supabase Storage + Firestore
         async function deleteFileFromSupabase(filename) {
             if (!isFirebaseReady) return false;
+            if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+                console.warn("⚠️ Supabase не настроен");
+                return false;
+            }
             
             try {
                 // Определяем storageName (если файл был загружен ранее)
