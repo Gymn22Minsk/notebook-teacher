@@ -158,9 +158,14 @@
                     clearTimeout(firebaseFolderRenderTimeout);
                     firebaseFolderRenderTimeout = setTimeout(() => {
                         console.log("🔄 Получены обновления папок из Firebase!");
+                        const savedNotes = document.getElementById("teacherNotes")?.value;
                         createPages();
                         applySpread();
                         renderAllFilesLists();
+                        if (savedNotes !== undefined) {
+                            const el = document.getElementById("teacherNotes");
+                            if (el) el.value = savedNotes;
+                        }
                     }, 300);
                 });
             } catch (error) {
@@ -1090,7 +1095,7 @@
 
         function handleSheetClick(sheetIndex, e) {
             if (isAnimating) return;
-            if (e.target.closest('a') || e.target.closest('button') || e.target.closest('textarea') || e.target.closest('.upload-zone') || e.target.closest('.editable-content')) {
+            if (e.target.closest('a') || e.target.closest('button') || e.target.closest('textarea') || e.target.closest('.upload-zone') || e.target.closest('.editable-content') || e.target.closest('.page-scroll-content') || e.target.closest('.files-section') || e.target.closest('.subfolder-container')) {
                 return;
             }
 
@@ -1122,6 +1127,51 @@
         }
 
         // (wheel handlers removed — using native scroll)
+        // НОВОЕ: Wheel-прокрутка для внутреннего содержимого страниц блокнота
+        document.addEventListener('wheel', (e) => {
+            // Если фокус в input/textarea/contenteditable — не перехватываем
+            const target = e.target;
+            if (!target || !target.closest) return;
+            if (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.closest('[contenteditable="true"]')) return;
+
+            // Ищем активный .page-scroll-content под курсором через bounding rects.
+            // В 3D-сцене elementsFromPoint иногда возвращает неправильный порядок
+            // из-за transform-style preserve-3d, поэтому используем rects + z-index.
+            const x = e.clientX;
+            const y = e.clientY;
+            let scrollContainer = null;
+            let bestZ = -Infinity;
+
+            document.querySelectorAll('.page-scroll-content').forEach(candidate => {
+                const sheet = candidate.closest('.page-sheet');
+                if (!sheet) return;
+
+                const index = parseInt(sheet.dataset.index);
+                const isFlipped = sheet.classList.contains('flipped');
+                const isActiveLeft = (index === currentSpread - 1 && isFlipped);
+                const isActiveRight = (index === currentSpread && !isFlipped);
+                if (!isActiveLeft && !isActiveRight) return;
+
+                const rect = candidate.getBoundingClientRect();
+                if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                    const z = parseInt(sheet.style.zIndex || 0);
+                    if (z > bestZ) {
+                        bestZ = z;
+                        scrollContainer = candidate;
+                    }
+                }
+            });
+            if (!scrollContainer) return;
+
+            const canScrollDown = scrollContainer.scrollTop + scrollContainer.clientHeight < scrollContainer.scrollHeight - 1;
+            const canScrollUp = scrollContainer.scrollTop > 0;
+
+            // Если контейнер можно прокрутить в направлении wheel — прокручиваем его
+            if ((e.deltaY > 0 && canScrollDown) || (e.deltaY < 0 && canScrollUp)) {
+                e.preventDefault();
+                scrollContainer.scrollTop += e.deltaY;
+            }
+        }, { passive: false });
 
         // === ИНТЕРАКТИВНЫЕ ЗАМЕТКИ ===
         function saveNotes() {

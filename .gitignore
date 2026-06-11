@@ -31,6 +31,10 @@ index_v2.html
 # 🔧 Конфигурация с секретами
 config.js
 
+# 🧪 Тестовые артефакты
+test-notebook.js
+test-screenshots/
+
 # 🔧 System files
 .DS_Store
 Thumbs.db
