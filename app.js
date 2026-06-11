@@ -3,7 +3,7 @@
         let firebaseDb = null;
         let isFirebaseReady = false;
         
-        if (typeof firebase !== 'undefined' && firebaseConfig && firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PLACEHOLDER') {
+        if (typeof firebase !== 'undefined' && firebaseConfig && firebaseConfig.apiKey) {
             try {
                 firebase.initializeApp(firebaseConfig);
                 firebaseDb = firebase.firestore();
