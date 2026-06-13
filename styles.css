@@ -153,6 +153,45 @@ body {
     border-right: none;
 }
 
+.cover-logo {
+    width: 200px;
+    height: 200px;
+    background-image: url('logo.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    margin-bottom: 35px;
+    filter: drop-shadow(0 0 12px rgba(212,175,55,0.35));
+}
+
+.cover-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 36px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-align: center;
+    margin-bottom: 12px;
+    color: #f3e9dc;
+    text-shadow: 2px 3px 6px rgba(0,0,0,0.6);
+}
+
+.cover-subtitle {
+    font-size: 15px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #c5a880;
+    font-weight: 500;
+    margin-bottom: 45px;
+}
+
+.cover-divider {
+    width: 160px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #d4af37, transparent);
+    margin-bottom: 45px;
+}
+
 /* ===== МЕТАЛЛИЧЕСКИЕ УГОЛКИ ===== */
 .metal-corner {
     position: absolute;
@@ -215,6 +254,43 @@ body {
     line-height: 1.2;
 }
 
+/* ===== ОГЛАВЛЕНИЕ ===== */
+.toc-list {
+    margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.toc-item {
+    display: flex;
+    align-items: baseline;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 15px;
+    font-weight: 500;
+    color: #475569;
+}
+
+.toc-item:hover {
+    color: #b45309;
+    transform: translateX(4px);
+}
+
+.toc-dots {
+    flex: 1;
+    border-bottom: 1px dotted #94a3b8;
+    margin: 0 10px;
+    position: relative;
+    top: -4px;
+}
+
+.toc-page {
+    font-family: monospace;
+    font-size: 14px;
+    color: #94a3b8;
+}
+
 /* ===== НОМЕРА СТРАНИЦ ===== */
 .page-number {
     position: absolute;
@@ -257,6 +333,18 @@ body {
     border-radius: 8px;
     padding: 12px 14px;
     margin: 18px 0;
+}
+
+.files-section-title {
+    font-weight: 700;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #1e293b;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .doc-card {
@@ -329,6 +417,38 @@ body {
 
 .doc-card-action:hover {
     transform: scale(1.2);
+}
+
+/* ===== ПОЛЕЗНЫЕ ССЫЛКИ ===== */
+.web-link {
+    display: flex;
+    align-items: center;
+    padding: 8px 0;
+    color: #1e293b;
+    text-decoration: none;
+    border-bottom: 1px dashed rgba(197, 168, 128, 0.4);
+    transition: color 0.2s;
+}
+
+.web-link:hover {
+    color: #b45309;
+}
+
+.web-link-icon {
+    margin-right: 10px;
+    font-size: 18px;
+    color: #c5a880;
+}
+
+.web-link-title {
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.web-link-desc {
+    font-size: 13px;
+    color: #64748b;
+    margin-left: auto;
 }
 
 /* ===== НАВИГАЦИЯ ===== */
