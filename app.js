@@ -1126,7 +1126,6 @@
             });
         }
 
-        // (wheel handlers removed — using native scroll)
         // НОВОЕ: Wheel-прокрутка для внутреннего содержимого страниц блокнота
         document.addEventListener('wheel', (e) => {
             // Если фокус в input/textarea/contenteditable — не перехватываем
@@ -1134,13 +1133,16 @@
             if (!target || !target.closest) return;
             if (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.closest('[contenteditable="true"]')) return;
 
-            // Ищем активный .page-scroll-content под курсором через bounding rects.
-            // В 3D-сцене elementsFromPoint иногда возвращает неправильный порядок
-            // из-за transform-style preserve-3d, поэтому используем rects + z-index.
+            // Определяем левую/правую страницу по положению курсора относительно центра блокнота.
+            // Иначе правая страница (больший z-index) перехватывает прокрутку левой у корешка.
+            const book = document.querySelector('.book');
+            if (!book) return;
+            const bookRect = book.getBoundingClientRect();
+            const onLeftHalf = e.clientX < bookRect.left + bookRect.width / 2;
+
             const x = e.clientX;
             const y = e.clientY;
             let scrollContainer = null;
-            let bestZ = -Infinity;
 
             document.querySelectorAll('.page-scroll-content').forEach(candidate => {
                 const sheet = candidate.closest('.page-sheet');
@@ -1150,15 +1152,11 @@
                 const isFlipped = sheet.classList.contains('flipped');
                 const isActiveLeft = (index === currentSpread - 1 && isFlipped);
                 const isActiveRight = (index === currentSpread && !isFlipped);
-                if (!isActiveLeft && !isActiveRight) return;
+                if (onLeftHalf ? !isActiveLeft : !isActiveRight) return;
 
                 const rect = candidate.getBoundingClientRect();
                 if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
-                    const z = parseInt(sheet.style.zIndex || 0);
-                    if (z > bestZ) {
-                        bestZ = z;
-                        scrollContainer = candidate;
-                    }
+                    scrollContainer = candidate;
                 }
             });
             if (!scrollContainer) return;
