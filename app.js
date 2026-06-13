@@ -1126,52 +1126,68 @@
             });
         }
 
-        // НОВОЕ: Wheel-прокрутка для внутреннего содержимого страниц блокнота
+        function isActiveScrollContainer(container) {
+            const sheet = container.closest('.page-sheet');
+            if (!sheet) return false;
+            const index = parseInt(sheet.dataset.index);
+            const isFlipped = sheet.classList.contains('flipped');
+            return (index === currentSpread - 1 && isFlipped) || (index === currentSpread && !isFlipped);
+        }
+
+        function getActiveScrollContainers() {
+            const result = { left: null, right: null };
+            document.querySelectorAll('.page-scroll-content').forEach(candidate => {
+                const sheet = candidate.closest('.page-sheet');
+                if (!sheet) return;
+                const index = parseInt(sheet.dataset.index);
+                const isFlipped = sheet.classList.contains('flipped');
+                if (index === currentSpread - 1 && isFlipped) result.left = candidate;
+                if (index === currentSpread && !isFlipped) result.right = candidate;
+            });
+            return result;
+        }
+
+        function resolveScrollContainer(target, x) {
+            const direct = target.closest('.page-scroll-content');
+            if (direct && isActiveScrollContainer(direct)) return direct;
+
+            const face = target.closest('.paper-face');
+            if (face) {
+                const sheet = face.closest('.page-sheet');
+                const isFlipped = sheet?.classList.contains('flipped');
+                const isVisibleFace = face.classList.contains('back') ? isFlipped : !isFlipped;
+                if (sheet && isVisibleFace) {
+                    const scroll = face.querySelector('.page-scroll-content');
+                    if (scroll && isActiveScrollContainer(scroll)) return scroll;
+                }
+            }
+
+            const { left, right } = getActiveScrollContainers();
+            if (left && right) {
+                const leftFace = left.closest('.paper-face');
+                const rightFace = right.closest('.paper-face');
+                if (leftFace && rightFace) {
+                    const leftRect = leftFace.getBoundingClientRect();
+                    const rightRect = rightFace.getBoundingClientRect();
+                    const spineX = (leftRect.right + rightRect.left) / 2;
+                    return x < spineX ? left : right;
+                }
+            }
+            return left || right;
+        }
+
+        // Wheel-прокрутка для внутреннего содержимого страниц блокнота
         document.addEventListener('wheel', (e) => {
-            // Если фокус в input/textarea/contenteditable — не перехватываем
             const target = e.target;
             if (!target || !target.closest) return;
             if (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.closest('[contenteditable="true"]')) return;
 
-            const x = e.clientX;
-            const y = e.clientY;
-            let leftContainer = null;
-            let rightContainer = null;
-
-            document.querySelectorAll('.page-scroll-content').forEach(candidate => {
-                const sheet = candidate.closest('.page-sheet');
-                if (!sheet) return;
-
-                const index = parseInt(sheet.dataset.index);
-                const isFlipped = sheet.classList.contains('flipped');
-                const isActiveLeft = (index === currentSpread - 1 && isFlipped);
-                const isActiveRight = (index === currentSpread && !isFlipped);
-
-                if (isActiveLeft) leftContainer = candidate;
-                if (isActiveRight) rightContainer = candidate;
-            });
-
-            let scrollContainer = null;
-            if (leftContainer && rightContainer) {
-                const leftRect = leftContainer.getBoundingClientRect();
-                const rightRect = rightContainer.getBoundingClientRect();
-                const spineX = (leftRect.right + rightRect.left) / 2;
-                scrollContainer = x < spineX ? leftContainer : rightContainer;
-            } else if (leftContainer) {
-                scrollContainer = leftContainer;
-            } else if (rightContainer) {
-                scrollContainer = rightContainer;
-            }
-
+            const scrollContainer = resolveScrollContainer(target, e.clientX);
             if (!scrollContainer) return;
-
-            const rect = scrollContainer.getBoundingClientRect();
-            if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return;
 
             const canScrollDown = scrollContainer.scrollTop + scrollContainer.clientHeight < scrollContainer.scrollHeight - 1;
             const canScrollUp = scrollContainer.scrollTop > 0;
 
-            // Если контейнер можно прокрутить в направлении wheel — прокручиваем его
             if ((e.deltaY > 0 && canScrollDown) || (e.deltaY < 0 && canScrollUp)) {
                 e.preventDefault();
                 scrollContainer.scrollTop += e.deltaY;

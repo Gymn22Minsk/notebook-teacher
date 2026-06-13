@@ -124,6 +124,16 @@ body {
     backface-visibility: hidden;
     box-shadow: 0 10px 35px rgba(0,0,0,0.35);
     border-radius: 4px;
+    pointer-events: auto;
+}
+
+/* Скрытая грань не должна перехватывать клики и прокрутку */
+.page-sheet:not(.flipped) .face.back {
+    pointer-events: none;
+}
+
+.page-sheet.flipped .face.front {
+    pointer-events: none;
 }
 
 /* ===== ОБЛОЖКА ===== */
@@ -237,6 +247,9 @@ body {
     line-height: 30px;
     color: #334155;
     font-weight: 400;
+    pointer-events: auto;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
 }
 
 .page-scroll-content::-webkit-scrollbar { width: 4px; }
