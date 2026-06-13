@@ -1133,16 +1133,10 @@
             if (!target || !target.closest) return;
             if (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.closest('[contenteditable="true"]')) return;
 
-            // Определяем левую/правую страницу по положению курсора относительно центра блокнота.
-            // Иначе правая страница (больший z-index) перехватывает прокрутку левой у корешка.
-            const book = document.querySelector('.book');
-            if (!book) return;
-            const bookRect = book.getBoundingClientRect();
-            const onLeftHalf = e.clientX < bookRect.left + bookRect.width / 2;
-
             const x = e.clientX;
             const y = e.clientY;
-            let scrollContainer = null;
+            let leftContainer = null;
+            let rightContainer = null;
 
             document.querySelectorAll('.page-scroll-content').forEach(candidate => {
                 const sheet = candidate.closest('.page-sheet');
@@ -1152,14 +1146,27 @@
                 const isFlipped = sheet.classList.contains('flipped');
                 const isActiveLeft = (index === currentSpread - 1 && isFlipped);
                 const isActiveRight = (index === currentSpread && !isFlipped);
-                if (onLeftHalf ? !isActiveLeft : !isActiveRight) return;
 
-                const rect = candidate.getBoundingClientRect();
-                if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
-                    scrollContainer = candidate;
-                }
+                if (isActiveLeft) leftContainer = candidate;
+                if (isActiveRight) rightContainer = candidate;
             });
+
+            let scrollContainer = null;
+            if (leftContainer && rightContainer) {
+                const leftRect = leftContainer.getBoundingClientRect();
+                const rightRect = rightContainer.getBoundingClientRect();
+                const spineX = (leftRect.right + rightRect.left) / 2;
+                scrollContainer = x < spineX ? leftContainer : rightContainer;
+            } else if (leftContainer) {
+                scrollContainer = leftContainer;
+            } else if (rightContainer) {
+                scrollContainer = rightContainer;
+            }
+
             if (!scrollContainer) return;
+
+            const rect = scrollContainer.getBoundingClientRect();
+            if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return;
 
             const canScrollDown = scrollContainer.scrollTop + scrollContainer.clientHeight < scrollContainer.scrollHeight - 1;
             const canScrollUp = scrollContainer.scrollTop > 0;
