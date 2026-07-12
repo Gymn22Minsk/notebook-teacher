@@ -1057,15 +1057,46 @@
             });
         }
 
+        function ensureSpreadDots() {
+            const host = document.getElementById('spreadDots');
+            if (!host) return;
+            if (host.dataset.count === String(totalSpreads + 1)) return;
+            host.innerHTML = '';
+            host.dataset.count = String(totalSpreads + 1);
+            for (let i = 0; i <= totalSpreads; i++) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'spread-dot';
+                btn.setAttribute('role', 'tab');
+                btn.setAttribute('aria-label', i === 0 ? 'Обложка' : `Разворот ${i}`);
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    goToSpread(i);
+                });
+                host.appendChild(btn);
+            }
+        }
+
         function updateNavigationUI() {
-            document.getElementById('prevBtn').disabled = currentSpread <= 0;
-            document.getElementById('nextBtn').disabled = currentSpread >= totalSpreads;
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            if (prevBtn) prevBtn.disabled = currentSpread <= 0;
+            if (nextBtn) nextBtn.disabled = currentSpread >= totalSpreads;
 
-            const leftPageNum = currentSpread > 0 ? currentSpread * 2 : '-';
-            const rightPageNum = currentSpread < totalSpreads ? currentSpread * 2 + 1 : '-';
+            const label = currentSpread === 0
+                ? 'Обложка'
+                : currentSpread === totalSpreads
+                    ? 'Конец'
+                    : `Разворот ${currentSpread} · ${totalSpreads}`;
 
-            document.getElementById('spreadIndicator').textContent = 
-                `Разворот ${currentSpread} из ${totalSpreads} (стр. ${leftPageNum} – ${rightPageNum})`;
+            const ind = document.getElementById('spreadIndicator');
+            if (ind) ind.textContent = label;
+
+            ensureSpreadDots();
+            document.querySelectorAll('.spread-dot').forEach((dot, i) => {
+                dot.classList.toggle('active', i === currentSpread);
+                dot.setAttribute('aria-selected', i === currentSpread ? 'true' : 'false');
+            });
         }
 
         function playFlipSound() {
@@ -1875,6 +1906,48 @@
             });
         }
 
+        // Клавиатура: ← → Home Esc
+        document.addEventListener('keydown', (e) => {
+            const tag = (e.target && e.target.tagName) || '';
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return;
+            if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+                e.preventDefault();
+                nextSpread();
+            } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+                e.preventDefault();
+                prevSpread();
+            } else if (e.key === 'Home') {
+                e.preventDefault();
+                goToHome();
+            } else if (e.key === 'Escape' && isAdminActive) {
+                e.preventDefault();
+                exitAdminMode();
+            }
+        });
+
+        // Свайп по блокноту (тач / trackpad)
+        (function bindBookSwipe() {
+            let startX = 0, startY = 0, tracking = false;
+            const stage = () => document.getElementById('notebookStage') || document.querySelector('.scene');
+            document.addEventListener('pointerdown', (e) => {
+                if (!stage()?.contains(e.target)) return;
+                if (e.target.closest('a,button,input,textarea,.doc-card,.toc-item,.admin-topbar')) return;
+                tracking = true;
+                startX = e.clientX;
+                startY = e.clientY;
+            });
+            document.addEventListener('pointerup', (e) => {
+                if (!tracking) return;
+                tracking = false;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+                if (dx < 0) nextSpread();
+                else prevSpread();
+            });
+            document.addEventListener('pointercancel', () => { tracking = false; });
+        })();
+
         // === СТАРТ ПРИЛОЖЕНИЯ ===
         initDB().then(async () => {
             console.log('[init] DB ready, starting Firebase sync...');
@@ -1899,6 +1972,8 @@
             applySpread();
             loadNotes();
             renderAllFilesLists();
+            ensureSpreadDots();
+            updateNavigationUI();
             
             // Анимация пера при первом открытии блокнота
             setTimeout(animatePen, 1200);
@@ -1910,6 +1985,8 @@
             applySpread();
             loadNotes();
             renderAllFilesLists();
+            ensureSpreadDots();
+            updateNavigationUI();
             
             setTimeout(animatePen, 1200);
         });

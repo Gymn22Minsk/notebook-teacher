@@ -26,10 +26,12 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <link rel="stylesheet" href="styles.css?v=20260712-fix404">
+    <link rel="stylesheet" href="styles.css?v=20260712-noshine">
 </head>
 <body>
     <div class="desk-surface"></div>
+    <div class="desk-glow" aria-hidden="true"></div>
+    <div class="desk-dust" aria-hidden="true"></div>
 
     <!-- Элегантное перо на столе -->
     <div class="fountain-pen" id="fountainPen"></div>
@@ -1201,11 +1203,15 @@
     </div><!-- /.notebook-stage -->
 
     <!-- Навигация -->
-    <div class="bottom-nav">
-        <button class="nav-btn home-btn" id="homeBtn" onclick="goToHome()" title="Вернуться на начало блокнота">🏠 Начало</button>
-        <button class="nav-btn" id="prevBtn" onclick="prevSpread()" disabled="">← Назад</button>
-        <span class="spread-indicator" id="spreadIndicator">Разворот 0 из 7 (стр. - – 1)</span>
-        <button class="nav-btn" id="nextBtn" onclick="nextSpread()">Вперед →</button>
+    <div class="bottom-nav" id="bottomNav">
+        <button class="nav-btn home-btn" id="homeBtn" onclick="goToHome()" title="На обложку (Home)">⌂</button>
+        <button class="nav-btn" id="prevBtn" onclick="prevSpread()" disabled title="Назад (←)">‹</button>
+        <div class="nav-center">
+            <div class="spread-dots" id="spreadDots" role="tablist" aria-label="Развороты"></div>
+            <span class="spread-indicator" id="spreadIndicator">Обложка</span>
+        </div>
+        <button class="nav-btn" id="nextBtn" onclick="nextSpread()" title="Вперёд (→)">›</button>
+        <button class="nav-btn nav-hint" id="keysHint" type="button" title="Клавиши: ← → Home" aria-label="Подсказка по клавишам">⌨</button>
     </div>
 
     <!-- Fallback конфигурация (переопределяется config.js, если он существует) -->
@@ -1227,6 +1233,6 @@
             window.SUPABASE_BUCKET = 'documents';
         }
     </script>
-    <script src="app.js?v=20260712-fix404"></script>
+    <script src="app.js?v=20260712-noshine"></script>
 
 </body></html>
