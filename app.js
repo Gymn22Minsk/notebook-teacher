@@ -31,6 +31,12 @@
                 
                 snapshot.forEach(doc => {
                     const fileObj = doc.data();
+                    // Служебный документ с текстами разделов — не файл
+                    if (isPageContentDoc(fileObj, doc.id)) {
+                        applyPageContentBundle(fileObj);
+                        return;
+                    }
+                    if (!fileObj || !fileObj.name) return;
                     activeCustomDocuments[fileObj.name] = fileObj;
                     
                     // Сохраняем в IndexedDB, но не теряем base64 если он есть локально
@@ -58,13 +64,24 @@
             if (!firebaseDb) return;
             try {
                 firebaseDb.collection("documents").onSnapshot(snapshot => {
+                    let pagesChanged = false;
                     snapshot.docChanges().forEach(change => {
-                        const fileObj = change.doc.data();
+                        const fileObj = change.doc.data() || {};
+                        if (isPageContentDoc(fileObj, change.doc.id)) {
+                            if (change.type !== 'removed') {
+                                applyPageContentBundle(fileObj);
+                                pagesChanged = true;
+                            }
+                            return;
+                        }
                         if (change.type === 'removed') {
-                            delete activeCustomDocuments[fileObj.name];
-                            delete localUploadedDocs[fileObj.name];
-                            deleteDocFromDB(fileObj.name);
+                            if (fileObj.name) {
+                                delete activeCustomDocuments[fileObj.name];
+                                delete localUploadedDocs[fileObj.name];
+                                deleteDocFromDB(fileObj.name);
+                            }
                         } else {
+                            if (!fileObj.name) return;
                             activeCustomDocuments[fileObj.name] = fileObj;
                             // Сохраняем в IndexedDB, сохраняя base64
                             const localData = localUploadedDocs[fileObj.name];
@@ -78,6 +95,15 @@
                     clearTimeout(firebaseRenderTimeout);
                     firebaseRenderTimeout = setTimeout(() => {
                         console.log("🔄 Получены обновления из Firebase!");
+                        if (pagesChanged && !(isAdminActive && document.activeElement?.closest?.('.editable-content'))) {
+                            const savedNotes = document.getElementById("teacherNotes")?.value;
+                            createPages();
+                            applySpread();
+                            if (savedNotes !== undefined) {
+                                const el = document.getElementById("teacherNotes");
+                                if (el) el.value = savedNotes;
+                            }
+                        }
                         renderAllFilesLists();
                     }, 300);
                 });
@@ -171,6 +197,132 @@
             } catch (error) {
                 console.warn("⚠️ Реал-тайм синхронизация папок недоступна");
             }
+        }
+
+        // === СИНХРОНИЗАЦИЯ ТЕКСТОВ СТРАНИЦ (для всех пользователей) ===
+        // Храним в уже разрешённой коллекции documents (те же Rules, что у файлов).
+        // Заметки (notes) сюда не входят — только localStorage на этом устройстве.
+        // Нельзя использовать id с "__" — Firestore резервирует такие имена
+        const PAGE_CONTENT_DOC_ID = "notebook_pages_content";
+        // Версия базовых текстов/вёрстки (при смене — игнор старого облачного снимка)
+        const NOTEBOOK_CONTENT_VERSION = '2026-07-pravki-ux-2';
+        let suppressPageContentListener = false;
+        let lastSavedPageHtml = {};
+
+        function isPageContentDoc(data, docId) {
+            if (docId === PAGE_CONTENT_DOC_ID) return true;
+            if (!data) return false;
+            if (data._kind === "page_content") return true;
+            if (data.name === PAGE_CONTENT_DOC_ID) return true;
+            return false;
+        }
+
+        function applyPageContentBundle(data) {
+            if (!data || !data.pages || typeof data.pages !== "object") return 0;
+            // Устаревший снимок в облаке (до текстовых/UX-правок) не подмешиваем
+            if (data.contentVersion && data.contentVersion !== NOTEBOOK_CONTENT_VERSION) {
+                console.log(`[page_content] Пропуск облачной версии ${data.contentVersion}, локальная ${NOTEBOOK_CONTENT_VERSION}`);
+                return 0;
+            }
+            // Снимки без version — тоже игнорируем (созданы до versioning), чтобы показать актуальные тексты из pagesData
+            if (!data.contentVersion) {
+                console.log("[page_content] Облачный снимок без version — используем тексты из приложения");
+                return 0;
+            }
+            let count = 0;
+            Object.keys(data.pages).forEach(pageId => {
+                if (!pageId || pageId === "notes") return;
+                const html = data.pages[pageId];
+                if (typeof html !== "string" || !html) return;
+                activeEditedPageHTML[pageId] = html;
+                localEditedPageHTML[pageId] = html;
+                lastSavedPageHtml[pageId] = html;
+                count++;
+            });
+            try {
+                localStorage.setItem("local_teacher_notebook_html", JSON.stringify(localEditedPageHTML));
+            } catch (e) { /* ignore quota */ }
+            return count;
+        }
+
+        async function syncPageContentWithFirebase() {
+            if (!firebaseDb) return;
+            try {
+                const doc = await firebaseDb.collection("documents").doc(PAGE_CONTENT_DOC_ID).get();
+                let count = 0;
+                if (doc.exists) {
+                    count = applyPageContentBundle(doc.data());
+                }
+                console.log(`✅ Синхронизировано ${count} текстов страниц с Firebase (documents/${PAGE_CONTENT_DOC_ID})`);
+            } catch (error) {
+                console.error("⚠️ Синхронизация текстов страниц FAILED:", error);
+            }
+        }
+
+        async function savePageContentToFirebase(pageId, html) {
+            if (!pageId || pageId === "notes") return;
+            if (lastSavedPageHtml[pageId] === html) return;
+            // Копим изменения; пачка уходит в saveAllPageContentToFirebase
+            activeEditedPageHTML[pageId] = html;
+            localEditedPageHTML[pageId] = html;
+            return saveAllPageContentToFirebase({ [pageId]: html });
+        }
+
+        async function saveAllPageContentToFirebase(pagesPatch) {
+            if (!isFirebaseReady || !firebaseDb) {
+                console.warn("⚠️ Firebase не готов — тексты страниц сохранены только локально");
+                return false;
+            }
+            if (!pagesPatch || !Object.keys(pagesPatch).length) return true;
+            try {
+                suppressPageContentListener = true;
+                const ref = firebaseDb.collection("documents").doc(PAGE_CONTENT_DOC_ID);
+                const snap = await ref.get();
+                const pages = (snap.exists && snap.data().pages && typeof snap.data().pages === "object")
+                    ? Object.assign({}, snap.data().pages)
+                    : {};
+                Object.keys(pagesPatch).forEach(pageId => {
+                    if (!pageId || pageId === "notes") return;
+                    pages[pageId] = pagesPatch[pageId];
+                    lastSavedPageHtml[pageId] = pagesPatch[pageId];
+                });
+                await ref.set({
+                    name: PAGE_CONTENT_DOC_ID,
+                    _kind: "page_content",
+                    sectionId: "_system",
+                    contentVersion: NOTEBOOK_CONTENT_VERSION,
+                    pages,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                console.log(`✅ Тексты страниц сохранены в облако (${Object.keys(pagesPatch).join(", ")})`);
+                showSaveToast("Сохранено в облако", "success");
+                return true;
+            } catch (e) {
+                console.error("Failed to save page content to Firebase:", e);
+                showSaveToast("Ошибка сохранения", "error");
+                return false;
+            } finally {
+                setTimeout(() => { suppressPageContentListener = false; }, 800);
+            }
+        }
+
+        let saveToastTimer;
+        function showSaveToast(message, type) {
+            const el = document.getElementById("saveToast");
+            if (!el) return;
+            el.textContent = message;
+            el.classList.remove("success", "error", "visible");
+            if (type) el.classList.add(type);
+            // reflow for re-animation
+            void el.offsetWidth;
+            el.classList.add("visible");
+            clearTimeout(saveToastTimer);
+            saveToastTimer = setTimeout(() => el.classList.remove("visible"), 2600);
+        }
+
+        // Отдельный listener не нужен: документы слушаются в listenToFirebaseChanges
+        function listenToFirebasePageContentChanges() {
+            // no-op (тексты приходят через onSnapshot коллекции documents)
         }
 
         // Вспомогательная функция: base64 → Blob
@@ -391,6 +543,15 @@
         let localEditedPageHTML = {};
         let localFolders = [];
 
+        // При обновлении content сбрасываем старый localStorage-кэш HTML
+        try {
+            const storedVersion = localStorage.getItem('local_teacher_content_version');
+            if (storedVersion !== NOTEBOOK_CONTENT_VERSION) {
+                localStorage.removeItem('local_teacher_notebook_html');
+                localStorage.setItem('local_teacher_content_version', NOTEBOOK_CONTENT_VERSION);
+            }
+        } catch(e) { console.error(e); }
+
         try {
             const savedDeleted = localStorage.getItem('local_teacher_deleted_files');
             if (savedDeleted) localDeletedDefaultFiles = JSON.parse(savedDeleted);
@@ -432,32 +593,32 @@
                 type: 'cover',
                 front: {
                     html: `
-                        <div style="font-family:'Playfair Display', serif; font-size:15px; color:#c5a880; letter-spacing:1px; text-align:center; margin-bottom:8px; text-transform:uppercase;">ГУО «Гимназия № 22 г.Минска»</div>
+                        <div style="font-family:'Playfair Display', serif; font-size:15px; color:#c5a880; letter-spacing:1px; text-align:center; margin-bottom:8px; text-transform:uppercase;">ГУО «Гимназия № 22 г. Минска»</div>
                         <div style="font-family:'Montserrat', sans-serif; font-size:12px; color:rgba(255,255,255,0.5); letter-spacing:2px; text-align:center; margin-bottom:16px; text-transform:uppercase;">Ресурсный центр по русскому языку</div>
                         <div class="cover-logo"></div>
                         <div class="cover-title">Блокнот</div>
                         <div class="cover-title" style="font-size:26px; color:#d4af37;">молодого учителя</div>
                         <div class="cover-divider"></div>
                         <div style="font-family:'Caveat', cursive; font-size:24px; color:#c5a880;">Методическая копилка и личный дневник словесника</div>
-                        <div style="margin-top:40px; font-size:12px; color:rgba(255,255,255,0.3); text-transform:uppercase; letter-spacing:1px;">Нажмите "Вперед" для просмотра страниц</div>
+                        <div style="margin-top:40px; font-size:12px; color:rgba(255,255,255,0.3); text-transform:uppercase; letter-spacing:1px;">Нажмите «Вперед» для просмотра страниц</div>
                     `
                 },
                 back: {
-                    title: "Оглавление блокнота",
+                    title: "Содержание блокнота",
                     html: `
-                        <p style="margin-bottom:18px;">В этом блокноте собраны ключевые материалы, шаблоны рабочих документов в соответствии с требованиями образования РБ и полезные советы для организации учебного процесса:</p>
+                        <p style="margin-bottom:18px;">В этом блокноте собраны ключевые методические материалы, образцы рабочих документов, а также полезные советы для организации учебного процесса:</p>
                         <div class="toc-list">
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(1)">
                                 <span>1. Дидактические материалы</span><span class="toc-dots"></span><span class="toc-page">стр. 3</span>
                             </div>
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(2)">
-                                <span>2. Международный день на уроке</span><span class="toc-dots"></span><span class="toc-page">стр. 4</span>
+                                <span>2. Международный день на уроке русского языка</span><span class="toc-dots"></span><span class="toc-page">стр. 4</span>
                             </div>
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(2)">
                                 <span>3. Полезные ссылки</span><span class="toc-dots"></span><span class="toc-page">стр. 5</span>
                             </div>
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(3)">
-                                <span>4. Русские писатели на уроке</span><span class="toc-dots"></span><span class="toc-page">стр. 6</span>
+                                <span>4. Русские писатели на уроке русского языка</span><span class="toc-dots"></span><span class="toc-page">стр. 6</span>
                             </div>
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(3)">
                                 <span>5. Внеклассные мероприятия</span><span class="toc-dots"></span><span class="toc-page">стр. 7</span>
@@ -479,7 +640,7 @@
                             </div>
                         </div>
                         <div class="post-it-note" style="margin-top:25px;">
-                            💡 Вы можете быстро переходить по страницам блокнота, кликая по пунктам оглавления!
+                            💡 Вы можете быстро переходить по страницам блокнота, нажимая на пункты содержания!
                         </div>
                     `
                 }
@@ -491,29 +652,23 @@
                     sectionId: "didaktika",
                     title: "1. Дидактические материалы",
                     html: `
-                        <p>Раздаточные и дидактические материалы позволяют индивидуализировать обучение и организовать самостоятельную работу учащихся. Разработка карточек должна учитывать 10-балльную систему оценки результатов учебной деятельности.</p>
-                        <p><strong>Уровни усвоения учебного материала в школах РБ (для карточек):</strong></p>
-                        <ul class="todo-list">
-                            <li><strong>I-II уровни (1–4 балла)</strong> — Действия по узнаванию, воспроизведение по памяти.</li>
-                            <li><strong>III уровень (5–6 баллов)</strong> — Применение знаний в знакомой ситуации (правила, разборы).</li>
-                            <li><strong>IV-V уровни (7–10 баллов)</strong> — Творческое применение знаний.</li>
-                        </ul>
+                        <p>Дидактические материалы помогают учителю организовать обучение с учётом образовательных потребностей учащихся. Разнообразные методы и подходы позволяют адаптировать уроки под уровень подготовки и интересы учащихся, что способствует более эффективному усвоению материала.</p>
+                        <p>Предлагаемые материалы можно использовать как для работы на уроке, так и для проведения дополнительных занятий по предмету.</p>
                     `
                 },
                 back: {
                     sectionId: "mej_den",
-                    title: "2. Международный день на уроке русского",
+                    title: "2. Международный день на уроке русского языка",
                     html: `
-                        <p>Интеграция крупных праздников в учебный процесс способствует формированию социокультурной компетенции школьников и уважению к языковому разнообразию Республики Беларусь.</p>
-                        <p><strong>Календарь важных дат для уроков словесности:</strong></p>
-                        <ul class="todo-list">
+                        <p>Большое воспитательное значение имеет дидактический материал, который предлагается на уроках русского языка. Высказывания известных людей, пословицы и поговорки, цитаты из художественных произведений, специально подобранные тексты, дают возможность не только организовать работу по той или иной грамматической теме, но и побуждают учащихся делать нравственный выбор, формировать нравственную позицию.</p>
+                        <p>Работа с предлагаемым дидактическим материалом предполагает не только изучение грамматики, но и развитие речевых, нравственных, интеллектуальных сторон личности учащегося.</p>
+                        <p><strong>Календарь важных дат для уроков русского языка:</strong></p>
+                        <ul class="date-list">
                             <li><strong>Первое воскресенье сентября</strong> — День белорусской письменности</li>
                             <li><strong>21 февраля</strong> — Международный день родного языка</li>
                             <li><strong>24 мая</strong> — День славянской письменности и культуры</li>
-                            <li><strong>6 июня</strong> — День русского языка (Пушкинский день)</li>
+                            <li><strong>6 июня</strong> — День русского языка (Пушкинский день России)</li>
                         </ul>
-                        <p><strong>Идеи активностей на уроке:</strong><br>
-                        Сравнительно-лингвистический анализ схожих белорусских и русских фразеологизмов, исторический диктант «Путь Скорины».</p>
                     `
                 }
             },
@@ -522,45 +677,52 @@
                 type: 'paper',
                 front: {
                     sectionId: "ssylki",
-                    title: "3. Полезные ссылки для словесника",
+                    title: "3. Полезные ссылки для учителя-филолога",
                     html: `
                         <p>Официальные интернет-ресурсы, порталы и базы данных Министерства образования Республики Беларусь, необходимые для ежедневной работы педагога:</p>
                         
-                        <div style="margin-top: 15px; display:flex; flex-direction:column; gap:8px;">
-                            <a href="https://adu.by" target="_blank" class="web-link">
+                        <div style="margin-top: 15px; display:flex; flex-direction:column; gap:4px;">
+                            <a href="https://adu.by" target="_blank" class="web-link" rel="noopener noreferrer">
                                 <span class="web-link-icon">🌐</span>
-                                <span class="web-link-title">Национальный образовательный портал</span>
-                                <span class="web-link-desc">Учебные программы, КТП, учебники</span>
+                                <span class="web-link-text">
+                                    <span class="web-link-title">Национальный образовательный портал</span>
+                                    <span class="web-link-desc">Учебные программы, КТП, учебники</span>
+                                </span>
                             </a>
-                            <a href="https://rikc.by" target="_blank" class="web-link">
+                            <a href="https://rikc.by" target="_blank" class="web-link" rel="noopener noreferrer">
                                 <span class="web-link-icon">📚</span>
-                                <span class="web-link-title">РИКЗ</span>
-                                <span class="web-link-desc">Подготовка к ЦТ и ЦЭ (РИКЗ)</span>
+                                <span class="web-link-text">
+                                    <span class="web-link-title">РИКЗ</span>
+                                    <span class="web-link-desc">Подготовка к централизованному тестированию и экзамену</span>
+                                </span>
                             </a>
-                            <a href="https://edu.gov.by" target="_blank" class="web-link">
+                            <a href="https://edu.gov.by" target="_blank" class="web-link" rel="noopener noreferrer">
                                 <span class="web-link-icon">📝</span>
-                                <span class="web-link-title">Министерство образования РБ</span>
-                                <span class="web-link-desc">Инструкции и правовые акты</span>
+                                <span class="web-link-text">
+                                    <span class="web-link-title">Министерство образования Республики Беларусь</span>
+                                    <span class="web-link-desc">Инструкции и нормативные правовые акты</span>
+                                </span>
                             </a>
-                            <a href="https://academy.edu.by" target="_blank" class="web-link">
+                            <a href="https://academy.edu.by" target="_blank" class="web-link" rel="noopener noreferrer">
                                 <span class="web-link-icon">🖥️</span>
-                                <span class="web-link-title">Академия образования</span>
-                                <span class="web-link-desc">Повышение квалификации, аттестация</span>
+                                <span class="web-link-text">
+                                    <span class="web-link-title">Академия образования</span>
+                                    <span class="web-link-desc">Повышение квалификации, аттестация</span>
+                                </span>
                             </a>
                         </div>
                         <div class="post-it-note" style="margin-top: 25px;">
-                            ⚠️ Портал "Adu.by" — ваш главный источник актуальных учебных программ и инструктивно-методических писем на текущий учебный год!
+                            ⚠️ Портал adu.by — главный источник актуальных учебных программ и инструктивно-методических писем на текущий учебный год!
                         </div>
                     `
                 },
                 back: {
                     sectionId: "pisateli",
-                    title: "4. Русские писатели на уроке русского",
+                    title: "4. Русские писатели на уроке русского языка",
                     html: `
-                        <p>Изучение сложных тем грамматики и синтаксиса на живых классических текстах воспитывает безупречное языковое чутьё и культуру чтения.</p>
-                        <div class="quote-box">«Берегите наш язык, наш прекрасный русский язык — это клад, это достояние, переданное нам нашими предшественниками!»<br><span style="font-size:18px; font-weight:600;">— И. С. Тургенев</span></div>
-                        <p><strong>Межпредметные лингвистические связи:</strong></p>
-                        <p>• <i>Лингвокультурология:</i> Анализ текстов русских классиков, живших или путешествовавших по Беларуси (например, пребывание А.С. Пушкина в Могилеве и Минске, творчество И.С. Тургенева, Н.А. Некрасова).</p>
+                        <p>Использование на уроках русского языка материалов, посвящённых жизни и творчеству писателей, позволяет осуществлять принцип комплексного подхода к обучению.</p>
+                        <div class="quote-box">Берегите наш язык, наш прекрасный русский язык — это клад, это достояние, переданное нам нашими предшественниками! (И. Тургенев)</div>
+                        <p>Работа с художественным текстом как с единым целым, где языковые явления рассматриваются в их эстетической функции, а анализ сочетает лингвистический и литературоведческий подходы, позволяет изучать систему языка через призму художественного текста.</p>
                     `
                 }
             },
@@ -571,14 +733,14 @@
                     sectionId: "vneklass",
                     title: "5. Внеклассные мероприятия",
                     html: `
-                        <p>Воспитательная и внеклассная работа в учреждениях общего среднего образования Республики Беларусь опирается на Программу непрерывного воспитания детей и учащейся молодежи.</p>
-                        <div class="quote-box">«Ученик — это не сосуд, который нужно заполнить, а факел, который нужно зажечь».<br><span style="font-size:18px; font-weight:600;">— Плутарх</span></div>
-                        <p><strong>Чек-лист классных дел на четверть:</strong></p>
-                        <ul class="todo-list">
-                            <li>Определить темы классных и обязательных информационных часов</li>
-                            <li>Провести анкетирование увлечений и кружков</li>
-                            <li>Выбрать актив класса (староста, физорг, сектор правопорядка)</li>
-                            <li>Спланировать посещение знаковых мест Беларуси (экскурсионная программа)</li>
+                        <div class="quote-box">Ученик — не сосуд, который нужно наполнить, а факел, который нужно зажечь (Плутарх).</div>
+                        <p>Внеклассные мероприятия по русскому языку и литературе позволяют:</p>
+                        <ul class="bullet-list">
+                            <li>расширять филологические знания учащихся;</li>
+                            <li>развивать интерес к языку и литературе;</li>
+                            <li>развивать навыки аналитической и исследовательской деятельности;</li>
+                            <li>развивать творческие способности учащихся;</li>
+                            <li>совершенствовать навыки публичного выступления.</li>
                         </ul>
                     `
                 },
@@ -587,10 +749,10 @@
                     title: "6. Советуем прочитать",
                     html: `
                         <p>Рекомендуемая литература для профессионального развития педагогов-словесников Беларуси:</p>
-                        <ul class="todo-list" style="margin-bottom:15px;">
-                            <li><strong>К.И. Чуковский «Живой как жизнь»</strong><br><span style="font-size:13px; color:#555;">Классическая книга о культуре, развитии и чистоте речи.</span></li>
-                            <li><strong>Нора Галь «Слово живое и мёртвое»</strong><br><span style="font-size:13px; color:#555;">О борьбе с канцелярским языком и сохранении естественности речи.</span></li>
-                            <li><strong>Научно-методический журнал «Русский язык и литература»</strong><br><span style="font-size:13px; color:#555;">Официальное периодическое издание для белорусских учителей.</span></li>
+                        <ul class="bullet-list" style="margin-bottom:15px;">
+                            <li><strong>К. И. Чуковский «Живой как жизнь»</strong><br><span style="font-size:13px; color:#555;">Классическая книга о культуре, развитии и чистоте речи.</span></li>
+                            <li><strong>Нора Галь «Слово живое и мёртвое»</strong><br><span style="font-size:13px; color:#555;">О борьбе с канцеляризмами и сохранении естественности речи.</span></li>
+                            <li><strong>Научно-методический журнал «Русский язык и литература»</strong><br><span style="font-size:13px; color:#555;">Официальное периодическое издание для учителей русского языка и литературы в Республике Беларусь.</span></li>
                         </ul>
                         <div class="post-it-note">
                             📌 Изучайте методические сборники Национального института образования на портале adu.by!
@@ -605,15 +767,9 @@
                     sectionId: "soveti",
                     title: "7. Советы молодому учителю",
                     html: `
-                        <p>Профессиональный старт в школе требует знания нормативной базы и грамотного выстраивания отношений с учащимися и коллегами.</p>
-                        <p><strong>Памятка молодого педагога РБ:</strong></p>
-                        <ul class="todo-list">
-                            <li><strong>Кодекс Республики Беларусь об образовании</strong> — ваш главный нормативный правовой ориентир в профессиональной деятельности.</li>
-                            <li><strong>Единый речевой режим</strong> — строго контролируйте оформление письменных работ, тетрадей и дневников учащихся.</li>
-                            <li><strong>Классный журнал</strong> — ведите записи аккуратно, в строгом соответствии с Инструкцией Министерства образования РБ.</li>
-                        </ul>
+                        <p>Быть учителем – значит посвятить свою жизнь детям. Профессия учителя трудна, но почетна и прекрасна. Помните, что самое благое поприще – служение добру и правде; самая верная дорога – дорога честного труда; самый мужественный поступок – признание собственных ошибок; самая прочная жизненная опора – знания.</p>
                         <div class="post-it-note">
-                            🛡️ Совет: Каждый урок должен начинаться с проверки готовности рабочих мест и правильной осанки учащихся!
+                            Создайте для своих учеников возможность получить необычные впечатления, и они вознаградят вас редкостным прилежанием и особым отношением (Дэйв Бёрджес).
                         </div>
                     `
                 },
@@ -621,10 +777,8 @@
                     sectionId: "russkiy_jaz",
                     title: "8. Уроки русского языка",
                     html: `
-                        <p>Обучение русскому языку в школах Беларуси опирается на формирование языковой, речевой, коммуникативной и лингвокультурологической компетенций.</p>
-                        <p><strong>Методические основы проведения урока:</strong></p>
-                        <p>• <i>Официальное планирование:</i> Урок должен строго соответствовать учебной программе и календарно-тематическому планированию (КТП).<br>
-                        • <i>Контроль знаний:</i> Проводится в соответствии с «Нормами оценки результатов учебной деятельности учащихся по учебному предмету «Русский язык».</p>
+                        <div class="quote-box">Учитель должен снабжать ребенка цветами, из которых он мог бы добывать материал для меда, но перерабатывать его он должен сам (Монтень).</div>
+                        <p>Уровень усвоения знаний зависит от формы подачи материала: чем активнее человек вовлечён в процесс, тем глубже усваивается материал. Сначала дайте базовые теоретические знания, затем сделайте абстрактное наглядным (добавьте визуализацию), вовлеките в обсуждение (это позволит глубже погрузиться в тему), потом дайте практическую работу и, наконец, попросите объяснить (обучение других – эффективный способ закрепления знаний).</p>
                     `
                 }
             },
@@ -635,21 +789,19 @@
                     sectionId: "literatura",
                     title: "9. Уроки русской литературы",
                     html: `
-                        <p>Урок литературы — это пространство нравственного развития личности, сотворчества и осмысления духовного опыта поколений.</p>
-                        <p>Основная цель учебного предмета «Русская литература» — развитие у учащихся читательской грамотности, эстетического вкуса и гуманистического мировоззрения.</p>
-                        <div class="quote-box">«Чтение — это один из истоков мышления и умственного развития».<br><span style="font-size:18px; font-weight:600;">— В. А. Сухомлинский</span></div>
-                        <p><strong>Белорусские контексты на уроках русской литературы:</strong><br>
-                        Сравнительный анализ произведений русских и белорусских писателей на общие темы (например, темы Великой Отечественной войны у В. Быкова и Б. Васильева).</p>
+                        <div class="quote-box">Чтение — это один из истоков мышления и умственного развития (В. Сухомлинский).</div>
+                        <p>Урок есть открытие истины, поиск истины и осмысление истины.</p>
+                        <p>Урок есть часть жизни ребёнка, и проживание этой жизни должно совершаться на уровне высокой общечеловеческой культуры.</p>
                     `
                 },
                 back: {
                     sectionId: "notes",
-                    title: "10. Мои личные заметки",
+                    title: "10. Личные заметки учителя",
                     html: `
                         <p>Вы можете использовать это поле как свой персональный дневник для записей идей, планов на уроки и профессиональных наблюдений:</p>
                         <textarea class="notes-textarea" id="teacherNotes" placeholder="Напишите здесь свои заметки (текст сохраняется автоматически)..." oninput="saveNotes()"></textarea>
                         <div style="margin-top:20px; border-top:1px dashed #c5a880; padding-top:10px; font-size:12px; color:#64748b;">
-                            ⚡ Записи сохраняются локально в вашем браузере.
+                            ⚡ Заметки сохраняются только на этом компьютере (в браузере), не в облаке.
                         </div>
                     `
                 }
@@ -664,7 +816,7 @@
                             <div class="cover-title" style="font-size:26px; letter-spacing:1px; margin-bottom:10px;">Блокнот</div>
                             <div class="cover-title" style="font-size:20px; color:#d4af37; margin-bottom:20px;">молодого учителя</div>
                             <div class="cover-divider" style="margin-bottom:25px; width:100px;"></div>
-                            <p style="font-size:14px; color:#94a3b8; line-height:22px;">«Учитель соприкасается с вечностью: он никогда не может сказать, где заканчивается его влияние».</p>
+                            <p style="font-size:14px; color:#94a3b8; line-height:22px;">«Учитель соприкасается с вечностью: он никогда не может сказать, где заканчивается его влияние».<br><span style="font-size:12px; color:#64748b;">— Г. Б. Адамс</span></p>
                         </div>
                     `
                 },
@@ -697,6 +849,15 @@
         }
 
         function createPages() {
+            // Перед перерисовкой сохраняем только если автор реально менял DOM
+            // (не гоняем все страницы в Firebase при каждом входе в режим автора)
+            if (isAdminActive && document.querySelector('.editable-content[data-page-id]')) {
+                const activeEl = document.activeElement;
+                if (activeEl && activeEl.closest && activeEl.closest('.editable-content')) {
+                    saveEditedPagesFromDOM();
+                }
+            }
+
             const container = document.getElementById('pagesContainer');
             container.innerHTML = '';
             const ceAttr = isAdminActive ? 'contenteditable="true"' : '';
@@ -727,41 +888,39 @@
                         textBodyHTML = activeEditedPageHTML[sectionId];
                     }
 
-                    // Генерация папок для этой страницы
+                    // Генерация папок (не для заметок)
+                    const showFiles = sectionId !== 'notes';
                     let foldersHTML = '';
-                    const pageFolders = activeFolders.filter(f => f.sectionId === sectionId);
-                    pageFolders.forEach(folder => {
-                        foldersHTML += `
+                    if (showFiles) {
+                        const pageFolders = activeFolders.filter(f => f.sectionId === sectionId);
+                        pageFolders.forEach(folder => {
+                            foldersHTML += `
                             <div class="subfolder-container">
                                 <div class="subfolder-header">
                                     <span class="subfolder-icon">📁</span>
                                     <span class="subfolder-title">${folder.label}</span>
-                                    ${isAdminActive ? `<button class="delete-btn" style="opacity:1; right:15px; width:22px; height:22px; font-size:12px;" onclick="deleteCustomFolder('${folder.id}')" title="Удалить папку">&times;</button>` : ''}
+                                    ${isAdminActive ? `<button type="button" class="delete-btn" onclick="deleteCustomFolder('${folder.id}')" title="Удалить папку">&times;</button>` : ''}
                                 </div>
                                 <div class="subfolder-body">
                                     <div class="files-section" data-section="${sectionId}" data-subfolder="${folder.id}" style="border:none; background:none; padding:0; margin:0;">
                                         <div class="files-list"></div>
                                     </div>
                                 </div>
-                            </div>
-                        `;
-                    });
+                            </div>`;
+                        });
+                    }
 
                     frontFace.innerHTML = `
                         <div class="page-scroll-content">
                             <div class="editable-content" data-page-id="${sectionId}" ${ceAttr}>
                                 ${textBodyHTML}
                             </div>
-                            
+                            ${showFiles ? `
                             <div class="files-section" data-section="${sectionId}" data-subfolder="">
-                                <div class="files-section-title">📂 Общие материалы</div>
+                                <div class="files-section-title">📂 Материалы</div>
                                 <div class="files-list"></div>
                             </div>
-
                             ${foldersHTML}
-
-                            ${isAdminActive ? `
-                                <button class="nav-btn" style="background:#10b981; margin:15px 0 5px 0; width:100%; justify-content:center; border-color:#059669;" onclick="createCustomFolder('${sectionId}')">➕ Создать новую папку</button>
                             ` : ''}
                         </div>
                         <div class="page-number">${index * 2 + 1}</div>
@@ -812,41 +971,38 @@
                         textBodyHTML = activeEditedPageHTML[sectionId];
                     }
 
-                    // Генерация папок для этой страницы
+                    const showFilesBack = sectionId !== 'notes';
                     let foldersHTML = '';
-                    const pageFolders = activeFolders.filter(f => f.sectionId === sectionId);
-                    pageFolders.forEach(folder => {
-                        foldersHTML += `
+                    if (showFilesBack) {
+                        const pageFolders = activeFolders.filter(f => f.sectionId === sectionId);
+                        pageFolders.forEach(folder => {
+                            foldersHTML += `
                             <div class="subfolder-container">
                                 <div class="subfolder-header">
                                     <span class="subfolder-icon">📁</span>
                                     <span class="subfolder-title">${folder.label}</span>
-                                    ${isAdminActive ? `<button class="delete-btn" style="opacity:1; right:15px; width:22px; height:22px; font-size:12px;" onclick="deleteCustomFolder('${folder.id}')" title="Удалить папку">&times;</button>` : ''}
+                                    ${isAdminActive ? `<button type="button" class="delete-btn" onclick="deleteCustomFolder('${folder.id}')" title="Удалить папку">&times;</button>` : ''}
                                 </div>
                                 <div class="subfolder-body">
                                     <div class="files-section" data-section="${sectionId}" data-subfolder="${folder.id}" style="border:none; background:none; padding:0; margin:0;">
                                         <div class="files-list"></div>
                                     </div>
                                 </div>
-                            </div>
-                        `;
-                    });
+                            </div>`;
+                        });
+                    }
 
                     backFace.innerHTML = `
                         <div class="page-scroll-content">
                             <div class="editable-content" data-page-id="${sectionId}" ${ceAttr}>
                                 ${textBodyHTML}
                             </div>
-                            
+                            ${showFilesBack ? `
                             <div class="files-section" data-section="${sectionId}" data-subfolder="">
-                                <div class="files-section-title">📂 Общие материалы</div>
+                                <div class="files-section-title">📂 Материалы</div>
                                 <div class="files-list"></div>
                             </div>
-
                             ${foldersHTML}
-
-                            ${isAdminActive ? `
-                                <button class="nav-btn" style="background:#10b981; margin:15px 0 5px 0; width:100%; justify-content:center; border-color:#059669;" onclick="createCustomFolder('${sectionId}')">➕ Создать новую папку</button>
                             ` : ''}
                         </div>
                         <div class="page-number">${index * 2 + 2}</div>
@@ -877,6 +1033,10 @@
                 pageSheet.appendChild(backFace);
                 container.appendChild(pageSheet);
             });
+
+            if (isAdminActive) {
+                bindEditablePageSavers();
+            }
         }
 
         // === НАВИГАЦИЯ И ПЕРЕЛИСТЫВАНИЕ СТРАНИЦ ===
@@ -1195,6 +1355,46 @@
         }, { passive: false });
 
         // === ИНТЕРАКТИВНЫЕ ЗАМЕТКИ ===
+        // Сохранить HTML страниц (кроме заметок) → localStorage + Firebase (видно всем)
+        function saveEditedPagesFromDOM() {
+            const pagesPatch = {};
+            document.querySelectorAll('.editable-content[data-page-id]').forEach(el => {
+                const pageId = el.getAttribute('data-page-id');
+                if (!pageId || pageId === 'notes') return;
+                const html = el.innerHTML;
+                localEditedPageHTML[pageId] = html;
+                activeEditedPageHTML[pageId] = html;
+                if (lastSavedPageHtml[pageId] !== html) {
+                    pagesPatch[pageId] = html;
+                }
+            });
+            try {
+                localStorage.setItem('local_teacher_notebook_html', JSON.stringify(localEditedPageHTML));
+            } catch (e) {
+                console.error('Failed to save edited pages locally:', e);
+            }
+            // Одна запись в documents/notebook_pages_content — видят все
+            if (Object.keys(pagesPatch).length) {
+                saveAllPageContentToFirebase(pagesPatch);
+            }
+            return Object.keys(pagesPatch).length;
+        }
+
+        let saveEditedPagesTimeout;
+        function scheduleSaveEditedPages() {
+            clearTimeout(saveEditedPagesTimeout);
+            saveEditedPagesTimeout = setTimeout(saveEditedPagesFromDOM, 600);
+        }
+
+        function bindEditablePageSavers() {
+            document.querySelectorAll('.editable-content[data-page-id]').forEach(el => {
+                if (el.dataset.saveBound === '1') return;
+                el.dataset.saveBound = '1';
+                el.addEventListener('input', scheduleSaveEditedPages);
+                el.addEventListener('blur', saveEditedPagesFromDOM, true);
+            });
+        }
+
         function saveNotes() {
             const val = document.getElementById('teacherNotes').value;
             localStorage.setItem('local_teacher_notes', val);
@@ -1297,9 +1497,11 @@
                     });
                 }
 
-                // Добавляем файлы, добавленные автором
+                // Добавляем файлы, добавленные автором (служебные тексты страниц — пропускаем)
                 Object.keys(activeCustomDocuments).forEach(filename => {
                     const doc = activeCustomDocuments[filename];
+                    if (!doc || isPageContentDoc(doc, filename)) return;
+                    if (filename === PAGE_CONTENT_DOC_ID || doc._kind === "page_content") return;
                     const docSubfolder = doc.subfolderId || "";
                     if (doc.sectionId === sectionId && docSubfolder === subfolderId) {
                         allFilesForSection.push({ name: filename, isCustom: true });
@@ -1315,46 +1517,59 @@
                 });
 
                 totalFiles += allFilesForSection.length;
-                if (allFilesForSection.length === 0) {
-                    listEl.innerHTML = '<div style="font-size:12px; color:#94a3b8; font-style:italic; padding:6px 0;">Нет доступных материалов</div>';
+                if (allFilesForSection.length === 0 && !isAdminActive) {
+                    listEl.innerHTML = '<div class="files-empty">Нет материалов</div>';
                 } else {
                     allFilesForSection.forEach(file => {
                         const filename = file.name;
                         const isCustom = file.isCustom;
-                        const sizeText = isCustom ? 'Загружен автором' : '1.2 КБ (Шаблон)';
+                        const sizeText = isCustom ? 'Загружен автором' : 'Материал';
                         
                         const card = document.createElement('div');
                         card.className = 'doc-card';
                         const iconClass = getFileIconClass(filename);
                         const iconText = getFileIconText(filename);
+                        const safeName = filename.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                         
                         card.innerHTML = `
                             <div class="doc-card-icon ${iconClass}">${iconText}</div>
-                            <div class="doc-card-info" onclick="event.stopPropagation(); openFile('${filename}')" style="cursor:pointer;">
-                                <div class="doc-card-name" title="${filename}">${filename}</div>
+                            <div class="doc-card-info" onclick="event.stopPropagation(); openFile('${safeName}')" style="cursor:pointer;">
+                                <div class="doc-card-name" title="${filename.replace(/"/g, '&quot;')}">${filename}</div>
                                 <div class="doc-card-size">${sizeText}</div>
                             </div>
-                            <div class="doc-card-download" onclick="event.stopPropagation(); openFile('${filename}')" style="cursor:pointer;" title="Открыть">
+                            <div class="doc-card-download" onclick="event.stopPropagation(); openFile('${safeName}')" style="cursor:pointer;" title="Открыть">
                                 👁️
                             </div>
-                            ${isAdminActive ? `<button class="delete-btn" onclick="event.stopPropagation(); deleteFile('${filename}', '${sectionId}', ${isCustom})" title="Удалить файл">&times;</button>` : ''}
+                            ${isAdminActive ? `<button type="button" class="delete-btn" onclick="event.stopPropagation(); deleteFile('${safeName}', '${sectionId}', ${isCustom})" title="Удалить">&times;</button>` : ''}
                         `;
                         listEl.appendChild(card);
                     });
                 }
 
-                // Добавляем зону массовой загрузки файлов, если включен режим админа
-                if (isAdminActive) {
-                    const uploadZone = document.createElement('div');
-                    uploadZone.className = 'upload-zone';
-                    uploadZone.innerHTML = `
-                        <span class="upload-text">📎 Прикрепить файлы: DOCX, PPTX, PDF (массово)</span>
-                        <input type="file" accept=".doc,.docx,.rtf,.pptx,.pdf" multiple onchange="handleAuthorFileUpload(this, '${sectionId}', '${subfolderId}')">
+                // Компактные действия автора (не на содержании/заметках)
+                if (isAdminActive && sectionId !== 'notes' && sectionId !== 'toc') {
+                    const tools = document.createElement('div');
+                    tools.className = 'admin-file-tools';
+                    const inputId = `up_${sectionId}_${subfolderId || 'root'}_${Math.random().toString(36).slice(2, 7)}`;
+                    tools.innerHTML = `
+                        <label class="admin-tool-btn" for="${inputId}">+ Файл</label>
+                        <input id="${inputId}" class="admin-file-input" type="file" accept=".doc,.docx,.rtf,.pptx,.pdf" multiple>
+                        ${subfolderId === '' ? `<button type="button" class="admin-tool-btn" data-create-folder="${sectionId}">+ Папка</button>` : ''}
                     `;
-                    listEl.appendChild(uploadZone);
+                    const fileInput = tools.querySelector('input[type="file"]');
+                    fileInput.addEventListener('change', function() {
+                        handleAuthorFileUpload(this, sectionId, subfolderId);
+                    });
+                    const folderBtn = tools.querySelector('[data-create-folder]');
+                    if (folderBtn) {
+                        folderBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            createCustomFolder(sectionId);
+                        });
+                    }
+                    listEl.appendChild(tools);
                 }
             });
-            console.log(`[renderAllFilesLists] total sections rendered, custom docs count: ${Object.keys(activeCustomDocuments).length}, files in lists: ${totalFiles}`);
         }
 
         // Удаление файла (любого: как своего, так и предустановленного)
@@ -1384,7 +1599,7 @@
 
         // Создание новой папки динамически
         function createCustomFolder(sectionId) {
-            event.stopPropagation();
+            if (typeof event !== 'undefined' && event && event.stopPropagation) event.stopPropagation();
             const folderName = prompt("Введите название новой папки:");
             if (!folderName) return;
             const folderId = "folder_" + Date.now();
@@ -1438,41 +1653,90 @@
             }
         }
 
-        // === РЕЖИМ АВТОРА (АДМИН-ПАНЕЛЬ) ===
+        // === РЕЖИМ АВТОРА ===
+        function setAdminChrome(active) {
+            const lock = document.getElementById('adminLock');
+            const topbar = document.getElementById('adminTopbar');
+            const closed = lock?.querySelector('.lock-icon-closed');
+            const open = lock?.querySelector('.lock-icon-open');
+            if (active) {
+                document.body.classList.add('admin-mode');
+                if (topbar) topbar.hidden = false;
+                lock?.classList.add('unlocked');
+                if (closed) { closed.hidden = true; }
+                if (open) { open.hidden = false; }
+            } else {
+                document.body.classList.remove('admin-mode');
+                if (topbar) topbar.hidden = true;
+                lock?.classList.remove('unlocked');
+                if (closed) { closed.hidden = false; }
+                if (open) { open.hidden = true; }
+            }
+        }
+
         function toggleAdminMode() {
             if (isAdminActive) {
-                isAdminActive = false;
-                document.getElementById('adminLock').classList.remove('unlocked');
-                document.getElementById('adminBanner').style.display = 'none';
-                
+                exitAdminMode();
+                return;
+            }
+            const pass = prompt("Введите пароль для активации режима автора");
+            if (pass === 'teacher22') {
+                isAdminActive = true;
+                setAdminChrome(true);
                 document.querySelectorAll('.editable-content').forEach(el => {
-                    el.setAttribute('contenteditable', 'false');
+                    el.setAttribute('contenteditable', 'true');
                 });
-
                 createPages();
                 applySpread();
                 renderAllFilesLists();
+                bindEditablePageSavers();
                 playFlipSound();
-            } else {
-                const pass = prompt("Введите пароль для активации режима автора");
-                if (pass === 'teacher22') {
-                    isAdminActive = true;
-                    document.getElementById('adminLock').classList.add('unlocked');
-                    document.getElementById('adminBanner').style.display = 'flex';
-                    
-                    document.querySelectorAll('.editable-content').forEach(el => {
-                        el.setAttribute('contenteditable', 'true');
-                    });
-
-                    createPages();
-                    applySpread();
-                    renderAllFilesLists();
-                    playFlipSound();
-                } else if (pass !== null) {
-                    alert("Неверный пароль автора!");
-                }
+            } else if (pass !== null) {
+                alert("Неверный пароль автора!");
             }
         }
+
+        function exitAdminMode() {
+            if (!isAdminActive) return;
+            saveEditedPagesFromDOM();
+            isAdminActive = false;
+            setAdminChrome(false);
+            document.querySelectorAll('.editable-content').forEach(el => {
+                el.setAttribute('contenteditable', 'false');
+            });
+            createPages();
+            applySpread();
+            renderAllFilesLists();
+            playFlipSound();
+        }
+
+        function bindAdminChromeEvents() {
+            const lock = document.getElementById('adminLock');
+            const downloadBtn = document.getElementById('adminDownloadBtn');
+            const exitBtn = document.getElementById('adminExitBtn');
+            if (lock && !lock.dataset.bound) {
+                lock.dataset.bound = '1';
+                lock.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleAdminMode();
+                });
+            }
+            if (downloadBtn && !downloadBtn.dataset.bound) {
+                downloadBtn.dataset.bound = '1';
+                downloadBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    exportNotebookHTML();
+                });
+            }
+            if (exitBtn && !exitBtn.dataset.bound) {
+                exitBtn.dataset.bound = '1';
+                exitBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    exitAdminMode();
+                });
+            }
+        }
+        bindAdminChromeEvents();
 
         // Обработка массовой загрузки файлов автором
         async function handleAuthorFileUpload(input, sectionId, subfolderId = "") {
@@ -1553,11 +1817,15 @@
                 const wasAdmin = isAdminActive;
                 const oldSpread = currentSpread;
                 
+                // 0. Сохраняем правки текстов перед экспортом
+                if (isAdminActive) {
+                    saveEditedPagesFromDOM();
+                }
+
                 // 1. Временно отключаем режим автора для очистки разметки
                 if (isAdminActive) {
                     isAdminActive = false;
-                    document.getElementById('adminLock').classList.remove('unlocked');
-                    document.getElementById('adminBanner').style.display = 'none';
+                    setAdminChrome(false);
                     document.querySelectorAll('.editable-content').forEach(el => {
                         el.setAttribute('contenteditable', 'false');
                     });
@@ -1576,8 +1844,7 @@
                 isAdminActive = wasAdmin;
                 currentSpread = oldSpread;
                 if (isAdminActive) {
-                    document.getElementById('adminLock').classList.add('unlocked');
-                    document.getElementById('adminBanner').style.display = 'flex';
+                    setAdminChrome(true);
                     document.querySelectorAll('.editable-content').forEach(el => {
                         el.setAttribute('contenteditable', 'true');
                     });
@@ -1616,6 +1883,8 @@
             listenToFirebaseChanges();
             await syncFoldersWithFirebase();
             listenToFirebaseFolderChanges();
+            await syncPageContentWithFirebase();
+            listenToFirebasePageContentChanges();
             
             // Читаем загруженные документы из IndexedDB и объединяем
             const dbDocs = await getDocsFromDB();

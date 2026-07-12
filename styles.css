@@ -30,6 +30,12 @@ body {
     padding: 20px;
 }
 
+body.admin-mode {
+    align-items: center;
+    padding-top: 16px;
+    padding-bottom: 24px;
+}
+
 /* ===== СЦЕНА И БЛОКНОТ ===== */
 .desk-surface {
     position: fixed;
@@ -42,11 +48,15 @@ body {
 .scene {
     position: relative;
     z-index: 1;
-    width: min(90vw, 1140px);
-    height: min(90vh, 740px);
+    width: min(90vw, 1100px);
+    height: min(86vh, 720px);
     display: flex;
     justify-content: center;
     align-items: center;
+}
+
+body.admin-mode .scene {
+    height: min(80vh, 680px);
 }
 
 .book-wrapper {
@@ -381,6 +391,7 @@ body {
 }
 
 .doc-card {
+    position: relative;
     display: flex;
     align-items: center;
     background: #fff;
@@ -455,33 +466,50 @@ body {
 /* ===== ПОЛЕЗНЫЕ ССЫЛКИ ===== */
 .web-link {
     display: flex;
-    align-items: center;
-    padding: 8px 0;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 0;
     color: #1e293b;
     text-decoration: none;
     border-bottom: 1px dashed rgba(197, 168, 128, 0.4);
-    transition: color 0.2s;
+    transition: color 0.2s, background 0.2s;
+    border-radius: 4px;
 }
 
 .web-link:hover {
     color: #b45309;
+    background: rgba(212, 175, 55, 0.06);
 }
 
 .web-link-icon {
-    margin-right: 10px;
+    flex-shrink: 0;
     font-size: 18px;
+    line-height: 1.3;
     color: #c5a880;
+    width: 1.4em;
+    text-align: center;
+}
+
+.web-link-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
 }
 
 .web-link-title {
     font-weight: 600;
     font-size: 14px;
+    line-height: 1.35;
+    word-break: break-word;
 }
 
 .web-link-desc {
-    font-size: 13px;
+    font-size: 12px;
     color: #64748b;
-    margin-left: auto;
+    line-height: 1.35;
+    margin-left: 0;
 }
 
 /* ===== НАВИГАЦИЯ ===== */
@@ -535,35 +563,265 @@ body {
     font-weight: 600;
 }
 
-/* ===== КНОПКА АДМИНИСТРАТОРА ===== */
+/* ===== РЕЖИМ АВТОРА: современная панель над блокнотом (2026) ===== */
+.notebook-stage {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    width: min(90vw, 1100px);
+}
+
+.notebook-stage .scene {
+    width: 100%;
+}
+
+.admin-topbar {
+    display: none;
+    width: 100%;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin: 0 0 14px;
+    padding: 12px 14px 12px 16px;
+    border-radius: 20px;
+    /* Светлая «карточка» — читается на тёмном столе, не сливается */
+    background: #fffaf0;
+    border: 1px solid rgba(212, 175, 55, 0.45);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.9) inset,
+        0 14px 40px rgba(0, 0, 0, 0.28),
+        0 0 0 1px rgba(0, 0, 0, 0.04);
+    animation: adminTopIn 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.admin-topbar[hidden] {
+    display: none !important;
+}
+
+body.admin-mode .admin-topbar {
+    display: flex !important;
+}
+
+.admin-topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    flex: 1;
+}
+
+.admin-live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    padding: 7px 12px 7px 10px;
+    border-radius: 999px;
+    background: #111827;
+    color: #ffffff;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    box-shadow: 0 2px 8px rgba(17, 24, 39, 0.2);
+}
+
+.admin-live-pulse {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55);
+    animation: adminPulse 1.6s ease-out infinite;
+}
+
+.admin-topbar-sep {
+    width: 1px;
+    height: 22px;
+    background: rgba(30, 41, 59, 0.12);
+    flex-shrink: 0;
+}
+
+.admin-topbar-hint {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: #334155;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.admin-topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+/* Современные кнопки — не «серые пилюли 2010» */
+.admin-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 42px;
+    padding: 0 18px;
+    border-radius: 12px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    border: none;
+    white-space: nowrap;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.admin-btn svg {
+    flex-shrink: 0;
+}
+
+.admin-btn--secondary {
+    background: #ffffff;
+    color: #0f172a;
+    border: 1.5px solid #e2e8f0;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.admin-btn--secondary:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.1);
+}
+
+.admin-btn--secondary:active {
+    transform: translateY(0);
+}
+
+.admin-btn--primary {
+    background: linear-gradient(180deg, #e6c35c 0%, #d4af37 45%, #b8922e 100%);
+    color: #1a1208;
+    border: 1px solid rgba(139, 105, 20, 0.35);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.35) inset,
+        0 8px 20px rgba(184, 146, 46, 0.35);
+}
+
+.admin-btn--primary:hover {
+    transform: translateY(-1px);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.4) inset,
+        0 10px 24px rgba(184, 146, 46, 0.42);
+    filter: saturate(1.05);
+}
+
+.admin-btn--primary:active {
+    transform: translateY(0);
+}
+
+@keyframes adminTopIn {
+    from { opacity: 0; transform: translateY(-10px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes adminPulse {
+    0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55); }
+    70% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+/* Замок — только вход (правый верх), в режиме автора прячем */
 .admin-lock {
     position: fixed;
-    top: 25px;
-    right: 25px;
-    width: 46px;
-    height: 46px;
+    top: 20px;
+    right: 20px;
+    z-index: 1200;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
-    background: rgba(15, 10, 8, 0.85);
-    border: 1.5px solid var(--border-gold);
-    color: var(--border-gold);
-    display: flex;
+    background: rgba(12, 8, 6, 0.9);
+    border: 1px solid rgba(212, 175, 55, 0.55);
+    color: #d4af37;
+    display: inline-flex;
     justify-content: center;
     align-items: center;
     cursor: pointer;
-    z-index: 1000;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.4);
-    transition: all 0.2s ease;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+    transition: transform 0.18s ease, background 0.18s ease, opacity 0.2s ease;
+    padding: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    font: inherit;
 }
 
 .admin-lock:hover {
-    transform: scale(1.05);
-    background: var(--border-gold);
-    color: var(--primary-dark);
+    transform: scale(1.06);
+    background: rgba(212, 175, 55, 0.16);
 }
 
-.admin-lock.unlocked {
-    border-color: #10b981;
-    color: #10b981;
+body.admin-mode .admin-lock {
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.9);
+}
+
+.admin-lock .lock-icon-open[hidden],
+.admin-lock .lock-icon-closed[hidden] {
+    display: none !important;
+}
+
+/* старое меню/кнопки — никогда не показывать */
+.admin-menu,
+.admin-banner,
+.admin-export-btn,
+.admin-exit-btn,
+.admin-chrome {
+    display: none !important;
+}
+
+/* Toast — над нижней навигацией, не перекрывает центр книги */
+.save-toast {
+    position: fixed;
+    bottom: 88px;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    z-index: 2500;
+    background: rgba(20, 14, 10, 0.94);
+    color: #f3e9dc;
+    border: 1px solid rgba(212, 175, 55, 0.4);
+    padding: 10px 18px;
+    border-radius: 999px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.4);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    max-width: min(90vw, 380px);
+    text-align: center;
+}
+
+.save-toast.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.save-toast.error {
+    border-color: rgba(248, 113, 113, 0.55);
+    color: #fecaca;
+}
+
+.save-toast.success {
+    border-color: rgba(212, 175, 55, 0.55);
 }
 
 /* ===== МОДАЛЬНОЕ ОКНО ДЛЯ ПРОСМОТРА ===== */
@@ -688,11 +946,13 @@ body {
 
 /* ===== ЭЛЕГАНТНЫЙ ДИЗАЙН ТЕКСТА ===== */
 .page-text-body {
-    text-align: justify;
+    text-align: left;
+    hyphens: auto;
 }
 
 .page-text-body p {
     margin-bottom: 12px;
+    text-align: left;
 }
 
 .page-text-body strong {
@@ -704,25 +964,29 @@ body {
     font-family: 'Caveat', cursive;
     font-size: 24px;
     color: #2b4c7e;
-    line-height: 26px;
+    line-height: 1.25;
     border-left: 3px solid #2b4c7e;
     padding-left: 16px;
     margin: 18px 0;
     font-style: italic;
+    text-align: left;
 }
 
 .post-it-note {
     background: #fff9ae;
     box-shadow: 2px 5px 12px rgba(0,0,0,0.15);
-    padding: 14px;
+    padding: 12px 14px;
     font-family: 'Caveat', cursive;
-    font-size: 22px;
-    line-height: 24px;
+    font-size: 20px;
+    line-height: 1.25;
     color: #4a3e10;
-    transform: rotate(-1.5deg);
-    margin: 18px 10px;
+    transform: rotate(-1deg);
+    margin: 14px 4px 18px;
     border-radius: 2px;
     border-left: 3px solid #f2e205;
+    max-width: 100%;
+    box-sizing: border-box;
+    word-wrap: break-word;
 }
 
 .notes-textarea {
@@ -740,58 +1004,175 @@ body {
     margin-top: 10px;
 }
 
-.todo-list {
+/* Списки: точки, не чекбоксы */
+.todo-list,
+.bullet-list,
+.date-list {
     list-style: none;
     margin: 12px 0;
 }
 
-.todo-list li {
+.todo-list li,
+.bullet-list li,
+.date-list li {
     position: relative;
-    padding-left: 28px;
-    margin-bottom: 4px;
+    padding-left: 22px;
+    margin-bottom: 6px;
+    line-height: 1.45;
 }
 
-.todo-list li::before {
-    content: '☐';
+.todo-list li::before,
+.bullet-list li::before {
+    content: '•';
     position: absolute;
-    left: 0;
+    left: 2px;
     color: var(--border-gold);
-    font-size: 18px;
-    font-weight: bold;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.4;
 }
 
-/* ===== ИНСТРУМЕНТЫ АДМИНИСТРАТОРА ===== */
-.upload-zone {
-    margin-top: 10px;
-    background: rgba(16, 185, 129, 0.05);
-    border: 1.5px dashed #10b981;
-    border-radius: 6px;
-    padding: 10px;
-    text-align: center;
+.date-list li::before {
+    content: '–';
+    position: absolute;
+    left: 2px;
+    color: var(--border-gold);
+    font-size: 16px;
+    font-weight: 600;
+}
+
+/* ===== ИНСТРУМЕНТЫ АВТОРА ===== */
+.admin-file-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+
+.admin-tool-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 11px;
+    border-radius: 999px;
+    border: 1px solid rgba(139, 105, 20, 0.32);
+    background: rgba(255, 255, 255, 0.55);
+    color: #5c4a2e;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    user-select: none;
 }
 
-.upload-zone:hover {
-    background: rgba(16, 185, 129, 0.1);
+.admin-tool-btn:hover {
+    background: rgba(212, 175, 55, 0.16);
+    border-color: rgba(139, 105, 20, 0.55);
+    color: #3f321f;
 }
 
-.upload-zone input[type="file"] {
-    display: none;
+.admin-file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.files-empty {
+    font-size: 12px;
+    color: #94a3b8;
+    font-style: italic;
+    padding: 4px 0 2px;
+}
+
+.edit-hint {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: #a16207;
+    background: rgba(254, 243, 199, 0.65);
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    border-radius: 999px;
+    padding: 3px 10px;
+    margin: 0 0 10px;
+    display: inline-block;
+    pointer-events: none;
 }
 
 .editable-content {
     outline: none;
-    min-height: 50px;
+    min-height: 40px;
     border-radius: 4px;
-    transition: background-color 0.2s;
+    border: 1px solid transparent;
+    padding: 0;
+    transition: background-color 0.15s, box-shadow 0.15s;
 }
 
 .editable-content[contenteditable="true"] {
-    background-color: rgba(16, 185, 129, 0.04);
-    border: 1px dashed rgba(16, 185, 129, 0.3);
-    padding: 8px;
-    border-radius: 4px;
+    cursor: text;
+}
+
+.editable-content[contenteditable="true"]:hover {
+    background-color: rgba(212, 175, 55, 0.035);
+}
+
+.editable-content[contenteditable="true"]:focus {
+    background-color: rgba(212, 175, 55, 0.05);
+    box-shadow: inset 0 0 0 1px rgba(197, 168, 128, 0.3);
+}
+
+/* Крестик удаления — только при наведении */
+.delete-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.12);
+    color: #b91c1c;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.doc-card:hover .delete-btn,
+.subfolder-header:hover .delete-btn {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.delete-btn:hover {
+    background: #ef4444;
+    color: #fff;
+}
+
+
+
+.subfolder-header {
+    position: relative;
+}
+
+.toc-item > span:first-child {
+    flex: 0 1 auto;
+    min-width: 0;
+    word-break: break-word;
+}
+
+.toc-page {
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 /* ===== УЛУЧШЕННАЯ МОБИЛЬНАЯ АДАПТИВНОСТЬ ===== */
@@ -828,10 +1209,35 @@ body {
     }
     
     .admin-lock {
-        top: 15px;
-        right: 15px;
-        width: 40px;
+        top: 12px;
+        right: 12px;
+        width: 42px;
+        height: 42px;
+    }
+
+    .admin-topbar {
+        flex-wrap: wrap;
+        padding: 12px;
+        gap: 12px;
+        border-radius: 16px;
+    }
+
+    .admin-topbar-hint {
+        display: none;
+    }
+
+    .admin-topbar-sep {
+        display: none;
+    }
+
+    .admin-btn {
         height: 40px;
+        padding: 0 14px;
+        font-size: 12px;
+    }
+
+    .notebook-stage {
+        width: min(95vw, 1100px);
     }
     
     .fountain-pen {

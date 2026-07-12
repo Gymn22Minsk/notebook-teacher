@@ -13,7 +13,10 @@
     <!-- Конфигурация облачных сервисов (в .gitignore) -->
     <script src="config.js" onerror="console.log('[config] Локальный config.js не найден, используется fallback')"></script>
     
-    <link rel="stylesheet" href="styles.css">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <link rel="stylesheet" href="styles.css?v=20260712-admin3">
 </head>
 <body>
     <div class="desk-surface"></div>
@@ -26,16 +29,14 @@
         <path class="ink-path" d="M 180 700 C 300 500, 450 550, 550 480 C 650 410, 750 500, 900 450" fill="none" stroke="rgba(43, 30, 20, 0.08)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke-dasharray: 800; stroke-dashoffset: 800; transition: stroke-dashoffset 0s;"/>
     </svg>
 
-    <!-- Замочек входа в режим автора -->
-    <div class="admin-lock" id="adminLock" onclick="toggleAdminMode()" title="Режим редактирования блокнота">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-    </div>
-
-    <!-- Плавающий баннер автора -->
-    <div class="admin-banner" id="adminBanner" style="display: none;">
-        <span>📝 Режим автора активен. Добавьте файлы, отредактируйте тексты и сохраните сборку</span>
-        <button class="admin-export-btn" onclick="exportNotebookHTML()">Экспортировать блокнот</button>
-    </div>
+    <!-- Вход в режим автора -->
+    <button type="button" class="admin-lock" id="adminLock" title="Режим редактирования" aria-label="Режим автора">
+        <svg class="lock-icon-closed" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+        <svg class="lock-icon-open" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" hidden><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9 0"></path></svg>
+    </button>
+    <div id="adminBanner" hidden aria-hidden="true"></div>
+    <div id="adminMenu" hidden aria-hidden="true"></div>
+    <div class="save-toast" id="saveToast" aria-live="polite"></div>
 
     <!-- Модальное окно для просмотра документов (БЕЗ СКАЧИВАНИЯ) -->
     <div id="docViewerModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.9); z-index:3000; align-items:center; justify-content:center;">
@@ -50,7 +51,28 @@
         </div>
     </div>
 
-    <!-- Сцена с 3D блокнотом -->
+    <!-- Сцена + панель автора строго над блокнотом -->
+    <div class="notebook-stage" id="notebookStage">
+        <div class="admin-topbar" id="adminTopbar" hidden>
+            <div class="admin-topbar-left">
+                <span class="admin-live-badge">
+                    <span class="admin-live-pulse" aria-hidden="true"></span>
+                    Редактирование
+                </span>
+                <span class="admin-topbar-sep" aria-hidden="true"></span>
+                <span class="admin-topbar-hint">Автосохранение в облако</span>
+            </div>
+            <div class="admin-topbar-actions">
+                <button type="button" class="admin-btn admin-btn--secondary" id="adminDownloadBtn" title="Скачать копию блокнота">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg>
+                    Скачать
+                </button>
+                <button type="button" class="admin-btn admin-btn--primary" id="adminExitBtn" title="Выйти из режима автора">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                    Готово
+                </button>
+            </div>
+        </div>
     <div class="scene">
         <div class="book-wrapper">
             <div class="book" id="book">
@@ -58,7 +80,7 @@
                 <div class="spiral-spine" id="spiralSpine"><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div><div class="spiral-ring"></div></div>
                 <!-- Страницы -->
                 <div class="pages-container" id="pagesContainer"><div class="page-sheet" data-index="0"><div class="face front cover-front">
-                        <div style="font-family:'Playfair Display', serif; font-size:15px; color:#c5a880; letter-spacing:1px; text-align:center; margin-bottom:8px; text-transform:uppercase;">ГУО «Гимназия № 22 г.Минска»</div>
+                        <div style="font-family:'Playfair Display', serif; font-size:15px; color:#c5a880; letter-spacing:1px; text-align:center; margin-bottom:8px; text-transform:uppercase;">ГУО «Гимназия № 22 г. Минска»</div>
                         <div style="font-family:'Montserrat', sans-serif; font-size:12px; color:rgba(255,255,255,0.5); letter-spacing:2px; text-align:center; margin-bottom:16px; text-transform:uppercase;">Ресурсный центр по русскому языку</div>
                         <div class="cover-logo"></div>
                         <div class="cover-title">Блокнот</div>
@@ -72,13 +94,13 @@
                                 
                         <div class="page-header">Оглавление блокнота</div>
                         <div class="page-text-body">
-                        <p style="margin-bottom:18px;">В этом блокноте собраны ключевые материалы, шаблоны рабочих документов в соответствии с требованиями образования РБ и полезные советы для организации учебного процесса:</p>
+                        <p style="margin-bottom:18px;">В этом блокноте собраны ключевые методические материалы, образцы рабочих документов в соответствии с требованиями системы образования Республики Беларусь, а также полезные советы для организации учебного процесса:</p>
                         <div class="toc-list">
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(1)">
                                 <span>1. Дидактические материалы</span><span class="toc-dots"></span><span class="toc-page">стр. 3</span>
                             </div>
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(2)">
-                                <span>2. Международный день на уроке</span><span class="toc-dots"></span><span class="toc-page">стр. 4</span>
+                                <span>2. Памятные и праздничные даты на уроке</span><span class="toc-dots"></span><span class="toc-page">стр. 4</span>
                             </div>
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(2)">
                                 <span>3. Полезные ссылки</span><span class="toc-dots"></span><span class="toc-page">стр. 5</span>
@@ -106,7 +128,7 @@
                             </div>
                         </div>
                         <div class="post-it-note" style="margin-top:25px;">
-                            💡 Вы можете быстро переходить по страницам блокнота, кликая по пунктам оглавления!
+                            💡 Вы можете быстро переходить по страницам блокнота, нажимая на пункты оглавления!
                         </div>
                     </div>
                     
@@ -1166,6 +1188,7 @@
             </div>
         </div>
     </div>
+    </div><!-- /.notebook-stage -->
 
     <!-- Навигация -->
     <div class="bottom-nav">
@@ -1194,6 +1217,6 @@
             window.SUPABASE_BUCKET = 'documents';
         }
     </script>
-    <script src="app.js"></script>
+    <script src="app.js?v=20260712-admin3"></script>
 
 </body></html>
