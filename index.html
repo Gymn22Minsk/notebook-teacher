@@ -10,13 +10,23 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
-    <!-- Конфигурация облачных сервисов (в .gitignore) -->
-    <script src="config.js" onerror="console.log('[config] Локальный config.js не найден, используется fallback')"></script>
+    <!-- config.js только локально (файл в .gitignore; на GitHub Pages — fallback ниже) -->
+    <script>
+        (function () {
+            var host = location.hostname;
+            var local = host === 'localhost' || host === '127.0.0.1' || host === '';
+            if (!local) return;
+            var s = document.createElement('script');
+            s.src = 'config.js';
+            s.onerror = function () { /* fallback подключится ниже */ };
+            document.head.appendChild(s);
+        })();
+    </script>
     
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <link rel="stylesheet" href="styles.css?v=20260712-admin3">
+    <link rel="stylesheet" href="styles.css?v=20260712-fix404">
 </head>
 <body>
     <div class="desk-surface"></div>
@@ -1217,6 +1227,6 @@
             window.SUPABASE_BUCKET = 'documents';
         }
     </script>
-    <script src="app.js?v=20260712-admin3"></script>
+    <script src="app.js?v=20260712-fix404"></script>
 
 </body></html>
