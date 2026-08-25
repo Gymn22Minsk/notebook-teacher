@@ -42,6 +42,7 @@ body.admin-mode {
     inset: 0;
     pointer-events: none;
     z-index: 0;
+    background: url('desk-decor-photorealistic-v2.png') center center / cover no-repeat;
     box-shadow: inset 0 0 100px rgba(0,0,0,0.8);
 }
 
@@ -85,11 +86,13 @@ body.admin-mode {
 .scene {
     position: relative;
     z-index: 1;
-    width: min(90vw, 1100px);
+    width: min(78vw, 1050px);
     height: min(86vh, 720px);
     display: flex;
     justify-content: center;
     align-items: center;
+    /* Оставляем слева свободное поле для фотореалистичного декора стола. */
+    transform: translateX(clamp(80px, 11vw, 170px));
 }
 
 body.admin-mode .scene {
@@ -204,11 +207,11 @@ body.admin-mode .scene {
 
 /* ===== ОБЛОЖКА ===== */
 .cover-front, .cover-back {
-    background: #1b263b;
+    background: #28395a;
     background-image: 
         radial-gradient(circle at 50% 50%, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.4) 100%),
         repeating-linear-gradient(45deg, rgba(0,0,0,0.1) 0px, rgba(0,0,0,0.1) 1px, transparent 1px, transparent 3px);
-    border: 6px solid #141c2c;
+    border: 6px solid #1d2a44;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -1022,6 +1025,7 @@ body.admin-mode .admin-lock {
 
 /* ===== ПЕРО НА СТОЛЕ ===== */
 .fountain-pen {
+    display: none;
     position: absolute;
     left: 20px;
     bottom: 40px;
@@ -1046,6 +1050,36 @@ body.admin-mode .admin-lock {
     border-left: 7px solid transparent;
     border-right: 7px solid transparent;
     border-top: 22px solid var(--accent-gold);
+}
+
+/* ===== ДЕКОР СЛЕВА: СТИКЕРЫ, ОЧКИ, ВАЗА (векторные иллюстрации) ===== */
+.desk-decor {
+    display: none;
+}
+
+.desk-decor svg {
+    position: absolute;
+    display: block;
+    height: auto;
+}
+
+.decor-sticky {
+    top: 36px;
+    left: 26px;
+    width: 240px;
+}
+
+.decor-glasses {
+    top: 44%;
+    left: 26px;
+    width: 210px;
+    transform: rotate(-8deg);
+}
+
+.decor-vase {
+    left: 84px;
+    bottom: 24px;
+    width: 140px;
 }
 
 
@@ -1297,6 +1331,11 @@ body.admin-mode .admin-lock {
 
 /* ===== УЛУЧШЕННАЯ МОБИЛЬНАЯ АДАПТИВНОСТЬ ===== */
 @media (max-width: 768px) {
+    .scene {
+        width: min(90vw, 1100px);
+        transform: none;
+    }
+
     html, body {
         overflow: auto;
         height: auto;
@@ -1361,6 +1400,10 @@ body.admin-mode .admin-lock {
     }
     
     .fountain-pen {
+        display: none;
+    }
+
+    .desk-decor {
         display: none;
     }
 }

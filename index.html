@@ -26,7 +26,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <link rel="stylesheet" href="styles.css?v=20260712-noshine">
+    <link rel="stylesheet" href="styles.css?v=20260825-decor">
 </head>
 <body>
     <div class="desk-surface"></div>
@@ -35,6 +35,203 @@
 
     <!-- Элегантное перо на столе -->
     <div class="fountain-pen" id="fountainPen"></div>
+
+    <!-- Декор на столе слева: стикеры, очки, ваза с цветами (векторные иллюстрации) -->
+    <div class="desk-decor" aria-hidden="true">
+        <!-- Стикеры: плотная дизайнерская бумага, фактура, заломленные края и мягкие тени -->
+        <svg class="decor-sticky" viewBox="0 0 240 230" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="sn-gold" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#f2e4b0"/>
+                    <stop offset="0.55" stop-color="#e9d89b"/>
+                    <stop offset="1" stop-color="#d9c383"/>
+                </linearGradient>
+                <linearGradient id="sn-blue" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#bccadb"/>
+                    <stop offset="0.55" stop-color="#a4b6cb"/>
+                    <stop offset="1" stop-color="#90a6bd"/>
+                </linearGradient>
+                <filter id="sn-shadow" x="-40%" y="-40%" width="180%" height="180%">
+                    <feDropShadow dx="2" dy="3" stdDeviation="2.5" flood-color="#070b12" flood-opacity="0.28"/>
+                    <feDropShadow dx="7" dy="13" stdDeviation="7" flood-color="#070b12" flood-opacity="0.24"/>
+                </filter>
+                <filter id="sn-paper" x="0" y="0" width="100%" height="100%">
+                    <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" result="n"/>
+                    <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.22 0.22 0.22 0 0" result="tex"/>
+                    <feComposite in="tex" in2="SourceAlpha" operator="in" result="grain"/>
+                    <feMerge>
+                        <feMergeNode in="SourceGraphic"/>
+                        <feMergeNode in="grain"/>
+                    </feMerge>
+                </filter>
+            </defs>
+            <g transform="rotate(-6 58 56)" filter="url(#sn-shadow)">
+                <g filter="url(#sn-paper)">
+                    <rect x="10" y="8" width="96" height="96" rx="3" fill="url(#sn-gold)" stroke="#8b6c27" stroke-opacity="0.28"/>
+                    <path d="M 10 8 H 106 V 25 C 79 20 38 20 10 25 Z" fill="#fffdf4" opacity="0.20"/>
+                    <path d="M 94 104 H 106 V 91 Z" fill="#8d722f" opacity="0.26"/>
+                    <g stroke="#1e293b" stroke-opacity="0.12" stroke-width="1">
+                        <line x1="18" y1="36" x2="98" y2="36"/>
+                        <line x1="18" y1="51" x2="98" y2="51"/>
+                        <line x1="18" y1="66" x2="98" y2="66"/>
+                        <line x1="18" y1="81" x2="98" y2="81"/>
+                    </g>
+                </g>
+            </g>
+            <g transform="rotate(5 148 90)" filter="url(#sn-shadow)">
+                <g filter="url(#sn-paper)">
+                    <rect x="100" y="42" width="96" height="96" rx="3" fill="url(#sn-blue)" stroke="#30496b" stroke-opacity="0.35"/>
+                    <path d="M 100 42 H 196 V 59 C 169 54 129 54 100 59 Z" fill="#f8fbff" opacity="0.18"/>
+                    <path d="M 184 138 H 196 V 125 Z" fill="#2e4667" opacity="0.28"/>
+                    <g stroke="#1e293b" stroke-opacity="0.12" stroke-width="1">
+                        <line x1="108" y1="70" x2="188" y2="70"/>
+                        <line x1="108" y1="85" x2="188" y2="85"/>
+                        <line x1="108" y1="100" x2="188" y2="100"/>
+                        <line x1="108" y1="115" x2="188" y2="115"/>
+                    </g>
+                </g>
+            </g>
+            <g transform="rotate(-13 68 152)" filter="url(#sn-shadow)">
+                <g filter="url(#sn-paper)">
+                    <rect x="34" y="118" width="68" height="68" rx="3" fill="url(#sn-gold)" stroke="#8b6c27" stroke-opacity="0.28"/>
+                    <path d="M 34 118 H 102 V 130 C 81 126 55 126 34 130 Z" fill="#fffdf4" opacity="0.20"/>
+                    <path d="M 92 186 H 102 V 175 Z" fill="#8d722f" opacity="0.26"/>
+                    <g stroke="#1e293b" stroke-opacity="0.12" stroke-width="1">
+                        <line x1="42" y1="140" x2="94" y2="140"/>
+                        <line x1="42" y1="153" x2="94" y2="153"/>
+                        <line x1="42" y1="166" x2="94" y2="166"/>
+                    </g>
+                </g>
+            </g>
+        </svg>
+
+        <!-- Очки: полированная золотая оправа, прозрачные линзы и контактная тень -->
+        <svg class="decor-glasses" viewBox="0 0 220 100" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="gl-gold" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="#f2dc92"/>
+                    <stop offset="0.5" stop-color="#d4af37"/>
+                    <stop offset="1" stop-color="#a8842c"/>
+                </linearGradient>
+                <radialGradient id="gl-lens" cx="0.35" cy="0.3" r="1">
+                    <stop offset="0" stop-color="#ffffff" stop-opacity="0.16"/>
+                    <stop offset="0.5" stop-color="#94b2d6" stop-opacity="0.05"/>
+                    <stop offset="1" stop-color="#94b2d6" stop-opacity="0.10"/>
+                </radialGradient>
+                <filter id="gl-blur" x="-40%" y="-40%" width="180%" height="180%">
+                    <feGaussianBlur stdDeviation="3.5"/>
+                </filter>
+                <filter id="gl-shadow" x="-40%" y="-50%" width="180%" height="200%">
+                    <feDropShadow dx="2" dy="4" stdDeviation="1.8" flood-color="#05080f" flood-opacity="0.32"/>
+                    <feDropShadow dx="6" dy="10" stdDeviation="5" flood-color="#05080f" flood-opacity="0.22"/>
+                </filter>
+                <clipPath id="gl-clipL"><ellipse cx="55" cy="48" rx="34" ry="28"/></clipPath>
+                <clipPath id="gl-clipR"><ellipse cx="165" cy="48" rx="34" ry="28"/></clipPath>
+            </defs>
+            <ellipse cx="110" cy="92" rx="88" ry="5" fill="#05080f" opacity="0.35" filter="url(#gl-blur)"/>
+            <g filter="url(#gl-shadow)">
+            <path d="M 24 44 C 10 36 5 27 3 15" fill="none" stroke="url(#gl-gold)" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M 196 44 C 210 36 215 27 217 15" fill="none" stroke="url(#gl-gold)" stroke-width="2.5" stroke-linecap="round"/>
+            <ellipse cx="55" cy="48" rx="34" ry="28" fill="url(#gl-lens)"/>
+            <ellipse cx="165" cy="48" rx="34" ry="28" fill="url(#gl-lens)"/>
+            <g clip-path="url(#gl-clipL)">
+                <path d="M 34 30 L 58 20 L 44 74 L 24 62 Z" fill="#ffffff" opacity="0.14"/>
+                <ellipse cx="42" cy="34" rx="12" ry="5" fill="#ffffff" opacity="0.2" filter="url(#gl-blur)" transform="rotate(-24 42 34)"/>
+            </g>
+            <g clip-path="url(#gl-clipR)">
+                <path d="M 144 30 L 168 20 L 154 74 L 134 62 Z" fill="#ffffff" opacity="0.14"/>
+                <ellipse cx="152" cy="34" rx="12" ry="5" fill="#ffffff" opacity="0.2" filter="url(#gl-blur)" transform="rotate(-24 152 34)"/>
+            </g>
+            <ellipse cx="55" cy="48" rx="34" ry="28" fill="none" stroke="url(#gl-gold)" stroke-width="2.6"/>
+            <ellipse cx="165" cy="48" rx="34" ry="28" fill="none" stroke="url(#gl-gold)" stroke-width="2.6"/>
+            <path d="M 89 41 Q 110 30 131 41" fill="none" stroke="url(#gl-gold)" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="23" cy="45" r="2.6" fill="url(#gl-gold)"/>
+            <circle cx="197" cy="45" r="2.6" fill="url(#gl-gold)"/>
+            </g>
+        </svg>
+
+        <!-- Ваза: глубокий синий керамический глянец, золотые акценты, букет -->
+        <svg class="decor-vase" viewBox="0 0 150 260" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="va-navy" x1="0" y1="0" x2="1" y2="0.3">
+                    <stop offset="0" stop-color="#3d5a86"/>
+                    <stop offset="0.45" stop-color="#22395f"/>
+                    <stop offset="1" stop-color="#121f38"/>
+                </linearGradient>
+                <linearGradient id="va-gold" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="#e8cd7d"/>
+                    <stop offset="1" stop-color="#b8963a"/>
+                </linearGradient>
+                <linearGradient id="va-stem" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="#5c8260"/>
+                    <stop offset="1" stop-color="#33502f"/>
+                </linearGradient>
+                <radialGradient id="va-goldR" cx="0.35" cy="0.35" r="0.9">
+                    <stop offset="0" stop-color="#f4dd85"/>
+                    <stop offset="1" stop-color="#c9a227"/>
+                </radialGradient>
+                <radialGradient id="va-cream" cx="0.4" cy="0.35" r="1">
+                    <stop offset="0" stop-color="#f7efdb"/>
+                    <stop offset="1" stop-color="#e2d2ab"/>
+                </radialGradient>
+                <radialGradient id="va-bluep" cx="0.4" cy="0.35" r="1">
+                    <stop offset="0" stop-color="#d5e1f0"/>
+                    <stop offset="1" stop-color="#a7bedb"/>
+                </radialGradient>
+                <filter id="va-blur" x="-40%" y="-40%" width="180%" height="180%">
+                    <feGaussianBlur stdDeviation="3"/>
+                </filter>
+                <filter id="va-shadow" x="-40%" y="-40%" width="180%" height="190%">
+                    <feDropShadow dx="3" dy="6" stdDeviation="2.5" flood-color="#05080f" flood-opacity="0.36"/>
+                    <feDropShadow dx="8" dy="15" stdDeviation="7" flood-color="#05080f" flood-opacity="0.24"/>
+                </filter>
+            </defs>
+            <ellipse cx="75" cy="248" rx="48" ry="6" fill="#05080f" opacity="0.35" filter="url(#va-blur)"/>
+            <path d="M 63 154 C 57 122 51 100 45 76" fill="none" stroke="url(#va-stem)" stroke-width="3" stroke-linecap="round"/>
+            <path d="M 75 154 C 75 120 74 92 74 62" fill="none" stroke="url(#va-stem)" stroke-width="3" stroke-linecap="round"/>
+            <path d="M 87 154 C 93 124 99 104 105 80" fill="none" stroke="url(#va-stem)" stroke-width="3" stroke-linecap="round"/>
+            <g transform="translate(45 70)">
+                <g fill="url(#va-cream)" stroke="rgba(120,90,20,0.15)" stroke-width="0.5">
+                    <ellipse cx="0" cy="-9" rx="5" ry="8.5"/>
+                    <ellipse cx="0" cy="-9" rx="5" ry="8.5" transform="rotate(60)"/>
+                    <ellipse cx="0" cy="-9" rx="5" ry="8.5" transform="rotate(120)"/>
+                    <ellipse cx="0" cy="-9" rx="5" ry="8.5" transform="rotate(180)"/>
+                    <ellipse cx="0" cy="-9" rx="5" ry="8.5" transform="rotate(240)"/>
+                    <ellipse cx="0" cy="-9" rx="5" ry="8.5" transform="rotate(300)"/>
+                </g>
+                <circle r="4.6" fill="url(#va-goldR)"/>
+            </g>
+            <g transform="translate(74 56) scale(1.15)">
+                <g fill="url(#va-bluep)" stroke="rgba(30,50,90,0.15)" stroke-width="0.5">
+                    <ellipse cx="0" cy="-9" rx="5" ry="8.5"/>
+                    <ellipse cx="0" cy="-9" rx="5" ry="8.5" transform="rotate(60)"/>
+                    <ellipse cx="0" cy="-9" rx="5" ry="8.5" transform="rotate(120)"/>
+                    <ellipse cx="0" cy="-9" rx="5" ry="8.5" transform="rotate(180)"/>
+                    <ellipse cx="0" cy="-9" rx="5" ry="8.5" transform="rotate(240)"/>
+                    <ellipse cx="0" cy="-9" rx="5" ry="8.5" transform="rotate(300)"/>
+                </g>
+                <circle r="4.6" fill="url(#va-goldR)"/>
+            </g>
+            <g transform="translate(105 74)">
+                <g fill="url(#va-cream)" stroke="rgba(120,90,20,0.15)" stroke-width="0.5">
+                    <ellipse cx="0" cy="-9" rx="5" ry="8.5"/>
+                    <ellipse cx="0" cy="-9" rx="5" ry="8.5" transform="rotate(60)"/>
+                    <ellipse cx="0" cy="-9" rx="5" ry="8.5" transform="rotate(120)"/>
+                    <ellipse cx="0" cy="-9" rx="5" ry="8.5" transform="rotate(180)"/>
+                    <ellipse cx="0" cy="-9" rx="5" ry="8.5" transform="rotate(240)"/>
+                    <ellipse cx="0" cy="-9" rx="5" ry="8.5" transform="rotate(300)"/>
+                </g>
+                <circle r="4.6" fill="url(#va-goldR)"/>
+            </g>
+            <g filter="url(#va-shadow)">
+            <path d="M 45 150 C 39 172 38 198 47 222 C 53 237 62 243 75 243 C 88 243 97 237 103 222 C 112 198 111 172 105 150 Z" fill="url(#va-navy)" stroke="#0c1729" stroke-opacity="0.55" stroke-width="1"/>
+            <path d="M 41.5 174 C 60 178 90 178 108.5 174" fill="none" stroke="url(#va-gold)" stroke-width="2" opacity="0.9"/>
+            <path d="M 54 160 C 50 178 49 202 55 224" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round" opacity="0.12" filter="url(#va-blur)"/>
+            <ellipse cx="75" cy="150" rx="30" ry="7" fill="#0e1a2e"/>
+            <ellipse cx="75" cy="150" rx="30" ry="7" fill="none" stroke="url(#va-gold)" stroke-width="2"/>
+            </g>
+        </svg>
+    </div>
     
     <!-- След чернил при письме -->
     <svg class="ink-trail" id="inkTrail" viewBox="0 0 1200 900" preserveAspectRatio="none" style="position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:5; opacity:0; transition: opacity 0.4s ease;">
