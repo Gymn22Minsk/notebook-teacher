@@ -209,6 +209,13 @@
         let suppressPageContentListener = false;
         let lastSavedPageHtml = {};
 
+        // Нормализуем устаревшую ссылку из ранее сохранённых облачных и локальных версий страниц.
+        function normalizeAcademyLink(html) {
+            return typeof html === 'string'
+                ? html.replace(/https:\/\/academy\.edu\.by\/?/g, 'https://www.akademy.by/index.php/ru/')
+                : html;
+        }
+
         function isPageContentDoc(data, docId) {
             if (docId === PAGE_CONTENT_DOC_ID) return true;
             if (!data) return false;
@@ -232,7 +239,7 @@
             let count = 0;
             Object.keys(data.pages).forEach(pageId => {
                 if (!pageId || pageId === "notes") return;
-                const html = data.pages[pageId];
+                const html = normalizeAcademyLink(data.pages[pageId]);
                 if (typeof html !== "string" || !html) return;
                 activeEditedPageHTML[pageId] = html;
                 localEditedPageHTML[pageId] = html;
@@ -559,7 +566,12 @@
 
         try {
             const savedHtml = localStorage.getItem('local_teacher_notebook_html');
-            if (savedHtml) localEditedPageHTML = JSON.parse(savedHtml);
+            if (savedHtml) {
+                localEditedPageHTML = JSON.parse(savedHtml);
+                Object.keys(localEditedPageHTML).forEach(pageId => {
+                    localEditedPageHTML[pageId] = normalizeAcademyLink(localEditedPageHTML[pageId]);
+                });
+            }
         } catch(e) { console.error(e); }
 
         try {
