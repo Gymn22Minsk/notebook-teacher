@@ -848,6 +848,27 @@
             }
         }
 
+        function buildFoldersHTML(sectionId) {
+            let foldersHTML = '';
+            const pageFolders = activeFolders.filter(f => f.sectionId === sectionId);
+            pageFolders.forEach(folder => {
+                foldersHTML += `
+                            <div class="subfolder-container">
+                                <div class="subfolder-header">
+                                    <span class="subfolder-icon">📁</span>
+                                    <span class="subfolder-title">${folder.label}</span>
+                                    ${isAdminActive ? `<button type="button" class="delete-btn" onclick="deleteCustomFolder('${folder.id}')" title="Удалить папку">&times;</button>` : ''}
+                                </div>
+                                <div class="subfolder-body">
+                                    <div class="files-section" data-section="${sectionId}" data-subfolder="${folder.id}" style="border:none; background:none; padding:0; margin:0;">
+                                        <div class="files-list"></div>
+                                    </div>
+                                </div>
+                            </div>`;
+            });
+            return foldersHTML;
+        }
+
         function createPages() {
             // Перед перерисовкой сохраняем только если автор реально менял DOM
             // (не гоняем все страницы в Firebase при каждом входе в режим автора)
@@ -890,25 +911,7 @@
 
                     // Генерация папок (не для заметок)
                     const showFiles = sectionId !== 'notes';
-                    let foldersHTML = '';
-                    if (showFiles) {
-                        const pageFolders = activeFolders.filter(f => f.sectionId === sectionId);
-                        pageFolders.forEach(folder => {
-                            foldersHTML += `
-                            <div class="subfolder-container">
-                                <div class="subfolder-header">
-                                    <span class="subfolder-icon">📁</span>
-                                    <span class="subfolder-title">${folder.label}</span>
-                                    ${isAdminActive ? `<button type="button" class="delete-btn" onclick="deleteCustomFolder('${folder.id}')" title="Удалить папку">&times;</button>` : ''}
-                                </div>
-                                <div class="subfolder-body">
-                                    <div class="files-section" data-section="${sectionId}" data-subfolder="${folder.id}" style="border:none; background:none; padding:0; margin:0;">
-                                        <div class="files-list"></div>
-                                    </div>
-                                </div>
-                            </div>`;
-                        });
-                    }
+                    const foldersHTML = showFiles ? buildFoldersHTML(sectionId) : '';
 
                     frontFace.innerHTML = `
                         <div class="page-scroll-content">
@@ -972,25 +975,7 @@
                     }
 
                     const showFilesBack = sectionId !== 'notes';
-                    let foldersHTML = '';
-                    if (showFilesBack) {
-                        const pageFolders = activeFolders.filter(f => f.sectionId === sectionId);
-                        pageFolders.forEach(folder => {
-                            foldersHTML += `
-                            <div class="subfolder-container">
-                                <div class="subfolder-header">
-                                    <span class="subfolder-icon">📁</span>
-                                    <span class="subfolder-title">${folder.label}</span>
-                                    ${isAdminActive ? `<button type="button" class="delete-btn" onclick="deleteCustomFolder('${folder.id}')" title="Удалить папку">&times;</button>` : ''}
-                                </div>
-                                <div class="subfolder-body">
-                                    <div class="files-section" data-section="${sectionId}" data-subfolder="${folder.id}" style="border:none; background:none; padding:0; margin:0;">
-                                        <div class="files-list"></div>
-                                    </div>
-                                </div>
-                            </div>`;
-                        });
-                    }
+                    const foldersHTML = showFilesBack ? buildFoldersHTML(sectionId) : '';
 
                     backFace.innerHTML = `
                         <div class="page-scroll-content">
@@ -1549,8 +1534,15 @@
 
                 totalFiles += allFilesForSection.length;
                 if (allFilesForSection.length === 0 && !isAdminActive) {
-                    listEl.innerHTML = '<div class="files-empty">Нет материалов</div>';
+                    const hideEl = section.closest('.subfolder-container') || section;
+                    hideEl.style.display = 'none';
                 } else {
+                    section.style.display = '';
+                    const parentFolder = section.closest('.subfolder-container');
+                    if (parentFolder) parentFolder.style.display = '';
+                    if (allFilesForSection.length === 0 && isAdminActive) {
+                        // пустой список — только кнопки автора ниже
+                    } else {
                     allFilesForSection.forEach(file => {
                         const filename = file.name;
                         const isCustom = file.isCustom;
@@ -1575,6 +1567,7 @@
                         `;
                         listEl.appendChild(card);
                     });
+                    }
                 }
 
                 // Компактные действия автора (не на содержании/заметках)
