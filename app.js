@@ -703,7 +703,7 @@
                                     <span class="web-link-desc">Инструкции и нормативные правовые акты</span>
                                 </span>
                             </a>
-                            <a href="https://academy.edu.by" target="_blank" class="web-link" rel="noopener noreferrer">
+                            <a href="https://www.akademy.by/index.php/ru/" target="_blank" class="web-link" rel="noopener noreferrer">
                                 <span class="web-link-icon">🖥️</span>
                                 <span class="web-link-text">
                                     <span class="web-link-title">Академия образования</span>
