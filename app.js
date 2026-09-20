@@ -205,7 +205,7 @@
         // Нельзя использовать id с "__" — Firestore резервирует такие имена
         const PAGE_CONTENT_DOC_ID = "notebook_pages_content";
         // Версия базовых текстов/вёрстки (при смене — игнор старого облачного снимка)
-        const NOTEBOOK_CONTENT_VERSION = '2026-07-pravki-ux-2';
+        const NOTEBOOK_CONTENT_VERSION = '2026-09-acc-affordance';
         let suppressPageContentListener = false;
         let lastSavedPageHtml = {};
 
@@ -273,6 +273,33 @@
             activeEditedPageHTML[pageId] = html;
             localEditedPageHTML[pageId] = html;
             return saveAllPageContentToFirebase({ [pageId]: html });
+        }
+
+        async function migratePageContentIfNeeded() {
+            if (!isFirebaseReady || !firebaseDb) return;
+            try {
+                const ref = firebaseDb.collection("documents").doc(PAGE_CONTENT_DOC_ID);
+                const snap = await ref.get();
+                if (snap.exists && snap.data().contentVersion === NOTEBOOK_CONTENT_VERSION) return;
+                const pages = {};
+                document.querySelectorAll('.editable-content[data-page-id]').forEach(el => {
+                    const id = el.dataset.pageId;
+                    if (!id || id === 'notes' || id === 'endleaf') return;
+                    pages[id] = el.innerHTML;
+                });
+                await ref.set({
+                    name: PAGE_CONTENT_DOC_ID,
+                    _kind: "page_content",
+                    sectionId: "_system",
+                    contentVersion: NOTEBOOK_CONTENT_VERSION,
+                    pages,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                Object.keys(pages).forEach(id => { lastSavedPageHtml[id] = pages[id]; });
+                console.log(`✅ Firestore: обновлены тексты страниц (${NOTEBOOK_CONTENT_VERSION})`);
+            } catch (e) {
+                console.warn("⚠️ Не удалось обновить тексты страниц в Firestore:", e);
+            }
         }
 
         async function saveAllPageContentToFirebase(pagesPatch) {
@@ -571,6 +598,13 @@
                 Object.keys(localEditedPageHTML).forEach(pageId => {
                     localEditedPageHTML[pageId] = normalizeAcademyLink(localEditedPageHTML[pageId]);
                 });
+                const localVer = localStorage.getItem('local_teacher_notebook_content_version');
+                if (localVer !== NOTEBOOK_CONTENT_VERSION) {
+                    delete localEditedPageHTML.toc;
+                    delete localEditedPageHTML.nat_komponent;
+                    localStorage.setItem('local_teacher_notebook_content_version', NOTEBOOK_CONTENT_VERSION);
+                    try { localStorage.setItem('local_teacher_notebook_html', JSON.stringify(localEditedPageHTML)); } catch (e2) { /* quota */ }
+                }
             }
         } catch(e) { console.error(e); }
 
@@ -589,13 +623,16 @@
             { id: "didaktika", spread: 1 },
             { id: "mej_den", spread: 2 },
             { id: "ssylki", spread: 2 },
-            { id: "pisateli", spread: 3 },
-            { id: "vneklass", spread: 3 },
-            { id: "reading", spread: 4 },
-            { id: "soveti", spread: 4 },
-            { id: "russkiy_jaz", spread: 5 },
-            { id: "literatura", spread: 5 },
-            { id: "notes", spread: 6 }
+            { id: "nat_komponent", spread: 3 },
+            { id: "ce_rus", spread: 3 },
+            { id: "gifted", spread: 4 },
+            { id: "pisateli", spread: 4 },
+            { id: "vneklass", spread: 5 },
+            { id: "reading", spread: 5 },
+            { id: "soveti", spread: 6 },
+            { id: "russkiy_jaz", spread: 6 },
+            { id: "literatura", spread: 7 },
+            { id: "notes", spread: 7 }
         ];
 
         // === ГЕНЕРАЦИЯ СОДЕРЖИМОГО СТРАНИЦ ===
@@ -630,25 +667,34 @@
                                 <span>3. Полезные ссылки</span><span class="toc-dots"></span><span class="toc-page">стр. 5</span>
                             </div>
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(3)">
-                                <span>4. Русские писатели на уроке русского языка</span><span class="toc-dots"></span><span class="toc-page">стр. 6</span>
+                                <span>4. Дидактические материалы по реализации национального компонента</span><span class="toc-dots"></span><span class="toc-page">стр. 6</span>
                             </div>
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(3)">
-                                <span>5. Внеклассные мероприятия</span><span class="toc-dots"></span><span class="toc-page">стр. 7</span>
+                                <span>5. Подготовка к ЦЭ по русскому</span><span class="toc-dots"></span><span class="toc-page">стр. 7</span>
                             </div>
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(4)">
-                                <span>6. Советуем прочитать</span><span class="toc-dots"></span><span class="toc-page">стр. 8</span>
+                                <span>6. Работа с одарёнными учащимися</span><span class="toc-dots"></span><span class="toc-page">стр. 8</span>
                             </div>
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(4)">
-                                <span>7. Советы молодому учителю</span><span class="toc-dots"></span><span class="toc-page">стр. 9</span>
+                                <span>7. Русские писатели на уроке русского языка</span><span class="toc-dots"></span><span class="toc-page">стр. 9</span>
                             </div>
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(5)">
-                                <span>8. Уроки русского языка</span><span class="toc-dots"></span><span class="toc-page">стр. 10</span>
+                                <span>8. Внеклассные мероприятия</span><span class="toc-dots"></span><span class="toc-page">стр. 10</span>
                             </div>
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(5)">
-                                <span>9. Уроки русской литературы</span><span class="toc-dots"></span><span class="toc-page">стр. 11</span>
+                                <span>9. Советуем прочитать</span><span class="toc-dots"></span><span class="toc-page">стр. 11</span>
                             </div>
                             <div class="toc-item" onclick="event.stopPropagation(); goToSpread(6)">
-                                <span>10. Личные заметки учителя</span><span class="toc-dots"></span><span class="toc-page">стр. 12</span>
+                                <span>10. Советы молодому учителю</span><span class="toc-dots"></span><span class="toc-page">стр. 12</span>
+                            </div>
+                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(6)">
+                                <span>11. Уроки русского языка</span><span class="toc-dots"></span><span class="toc-page">стр. 13</span>
+                            </div>
+                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(7)">
+                                <span>12. Уроки русской литературы</span><span class="toc-dots"></span><span class="toc-page">стр. 14</span>
+                            </div>
+                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(7)">
+                                <span>13. Личные заметки учителя</span><span class="toc-dots"></span><span class="toc-page">стр. 15</span>
                             </div>
                         </div>
                         <div class="post-it-note" style="margin-top:25px;">
@@ -729,21 +775,168 @@
                     `
                 },
                 back: {
+                    sectionId: "nat_komponent",
+                    title: "4. Дидактические материалы по реализации национального компонента",
+                    html: `
+                        <p>Этот раздел содержит коллекцию текстов для проведения контрольных, обучающих диктантов и изложений. Все материалы объединены общей идеей - погружением учащихся в культурное, историческое и духовное наследие Беларуси через живое слово. В фокусе внимания находится национально-культурный компонент: использование текстов об истории, традициях, духовных ценностях, шедеврах искусства и выдающихся личностях страны.</p>
+                        <div class="topic-acc-list">
+                            <div class="topic-acc">
+                                <button type="button" class="topic-acc-toggle" onclick="event.stopPropagation(); toggleTopicAccordion(this)" aria-expanded="false">
+                                    <span class="topic-acc-title">Беларусь</span><span class="toc-dots"></span>
+                                    <span class="topic-acc-hint">открыть</span>
+                                    <span class="topic-acc-chevron" aria-hidden="true"></span>
+                                </button>
+                                <div class="topic-acc-panel">
+                                    <p>Mы живём в Бeлapycи. Этo нaшa Poдинa. Пpeкpacны eё люди, язык, пecни. Kpacивa пpиpoдa нaшeй cтpaны. B лecax вcтpeчaютcя paзныe дepeвья. Boт кpacнeют pябины. Meждy клёнaми и липaми бeлeют cтвoлы бepёз. B пyщe пpячyтcя зyбpы. Cвeтлыe лeca cмeняютcя шиpoкими пoлями. Ha пoляx зpeют poжь, кapтoфeль, лён.    Cлaвитcя Бeлapycь гoлyбыми oзёpaми и peкaми. B oзepe Hapoчь вoдятcя yдивитeльныe pыбы – yгpи. Ha бoлoтax мнoгo пoлeзныx pacтeний.    Любитe cвoй poднoй кpaй! (69 cлoв)</p>
+                                </div>
+                            </div>
+                            <div class="topic-acc">
+                                <button type="button" class="topic-acc-toggle" onclick="event.stopPropagation(); toggleTopicAccordion(this)" aria-expanded="false">
+                                    <span class="topic-acc-title">Белорусы</span><span class="toc-dots"></span>
+                                    <span class="topic-acc-hint">открыть</span>
+                                    <span class="topic-acc-chevron" aria-hidden="true"></span>
+                                </button>
+                                <div class="topic-acc-panel">
+                                    <p>Менталитет народа напоминает глиняную вавилонскую табличку, где под первым поверхностным слоем находился второй, более давний, причём их содержание может совпадать или не совпадать. Чтобы узнать подлинную суть вавилонского документа, следовало разбить верхний слой и прочитать то, что содержится внутри. А что мы можем таким образом узнать о своей стране? Белорус — житель равнин. Он воспринимает землю как живое и родное существо. Потому и самой страшной клятвой для белоруса испокон веков была клятва, произнесённая с землёй во рту или в руке. Земля для белоруса не просто место обитания. Здесь причудливо переплелись реальность и миф. В водоёмах живут зеленобородые водяники, заведующие течением, помутнением воды, разливами рек. В болоте проживает багник, благодаря пыхтению которого появляются пузырьки на поверхности. В лесу — лесун. Да и крестьянская усадьба населена и домовым, и овинником — сохранившимися и по сей день персонажами языческих верований наших древних предков. Это одновременное проявление и традиционного склада нашего народа, и его неистребимой фантазии. Недаром белорусская мифология — одна из богатейших мифологий Европы. Мир белоруса — всецело мир его земли. В белорусском фольклоре намного меньше упоминаний о дальних краях, чем в русском. Этот мир можно охватить взглядом. Не огромная и необъятная Родина, а «родны кут», край, уголок. Белорус — патриот своей, исконно принадлежащей ему земли. Об этом свидетельствуют его песни и сказки, его пословицы и поговорки. Белорусы, пожалуй, один из самых спокойных славянских народов. Белорус не ставит перед собой неосуществимой цели осчастливить весь мир, зато он сделает всё для счастья своих близких и для благополучия своей малой родины. (242 слова.)</p>
+                                </div>
+                            </div>
+                            <div class="topic-acc">
+                                <button type="button" class="topic-acc-toggle" onclick="event.stopPropagation(); toggleTopicAccordion(this)" aria-expanded="false">
+                                    <span class="topic-acc-title">Легкие Европы</span><span class="toc-dots"></span>
+                                    <span class="topic-acc-hint">открыть</span>
+                                    <span class="topic-acc-chevron" aria-hidden="true"></span>
+                                </button>
+                                <div class="topic-acc-panel">
+                                    <p>Беларусь часто называют «легкими Европы». Здесь растут густые леса и блестят тысячи чистых озер. Самый известный заповедник страны — это Беловежская пуща. В этом древнем лесу живут редкие животные, в том числе могучие зубры. Природа Беларуси поражает своей тишиной и красотой в любое время года.</p>
+                                </div>
+                            </div>
+                            <div class="topic-acc">
+                                <button type="button" class="topic-acc-toggle" onclick="event.stopPropagation(); toggleTopicAccordion(this)" aria-expanded="false">
+                                    <span class="topic-acc-title">Страна замков</span><span class="toc-dots"></span>
+                                    <span class="topic-acc-hint">открыть</span>
+                                    <span class="topic-acc-chevron" aria-hidden="true"></span>
+                                </button>
+                                <div class="topic-acc-panel">
+                                    <p>Беларусь — это край величественных замков и старинных храмов. Широкие проспекты крупных городов соседствуют здесь с уютными улочками. Всемирно известны Мирский замок и архитектурный комплекс в Несвиже, который много веков назад принадлежал богатому роду Радзивиллов. Эти места хранят множество легенд и памятников прошлого.</p>
+                                </div>
+                            </div>
+                            <div class="topic-acc">
+                                <button type="button" class="topic-acc-toggle" onclick="event.stopPropagation(); toggleTopicAccordion(this)" aria-expanded="false">
+                                    <span class="topic-acc-title">Сердце страны</span><span class="toc-dots"></span>
+                                    <span class="topic-acc-hint">открыть</span>
+                                    <span class="topic-acc-chevron" aria-hidden="true"></span>
+                                </button>
+                                <div class="topic-acc-panel">
+                                    <p>Главный город Беларуси — Минск. Это современный, светлый и очень зеленый город. Здесь широкие улицы пересекаются с тихими парками, а современные здания стоят рядом с историческими памятниками. В Минске живет много добрых и гостеприимных людей. Каждый, кто приезжает сюда, чувствует себя комфортно и уютно.</p>
+                                </div>
+                            </div>
+                            <div class="topic-acc">
+                                <button type="button" class="topic-acc-toggle" onclick="event.stopPropagation(); toggleTopicAccordion(this)" aria-expanded="false">
+                                    <span class="topic-acc-title">Брестская крепость</span><span class="toc-dots"></span>
+                                    <span class="topic-acc-hint">открыть</span>
+                                    <span class="topic-acc-chevron" aria-hidden="true"></span>
+                                </button>
+                                <div class="topic-acc-panel">
+                                    <p>Брестская крепость первой приняла на себя удар врага ранним утром двадцать второго июня тысяча девятьсот сорок первого года. Защитники цитадели проявили беспримерное мужество. Они долгие дни сражались в полном окружении, без воды, еды и патронов. На оплавленных кирпичах стен до сих пор видны надписи, оставленные героями. Самая известная из них гласит: «Умираю, но не сдаюсь! Прощай, Родина!». Сегодня мемориал в Бресте напоминает всему миру о стойкости человеческого духа.</p>
+                                </div>
+                            </div>
+                            <div class="topic-acc">
+                                <button type="button" class="topic-acc-toggle" onclick="event.stopPropagation(); toggleTopicAccordion(this)" aria-expanded="false">
+                                    <span class="topic-acc-title">Республика-партизанка</span><span class="toc-dots"></span>
+                                    <span class="topic-acc-hint">открыть</span>
+                                    <span class="topic-acc-chevron" aria-hidden="true"></span>
+                                </button>
+                                <div class="topic-acc-panel">
+                                    <p>В годы Великой Отечественной войны Беларусь называли республикой-партизанкой. На её оккупированной территории три года полыхало пламя всенародного сопротивления. Около четырехсот тысяч человек героически сражались с врагом в партизанских отрядах.</p><p>Белорусские леса стали настоящей крепостью для народных мстителей. Партизаны нарушали связь противника, взрывали мосты и пускали под откос вражеские поезда. Местные жители во всем помогали бойцам: делились последней едой, укрывали раненых и передавали ценные сведения. Без этой сплоченности и поддержки мирного населения победа над жестоким врагом была бы невозможна.</p>
+                                </div>
+                            </div>
+                            <div class="topic-acc">
+                                <button type="button" class="topic-acc-toggle" onclick="event.stopPropagation(); toggleTopicAccordion(this)" aria-expanded="false">
+                                    <span class="topic-acc-title">Операция «Багратион»</span><span class="toc-dots"></span>
+                                    <span class="topic-acc-hint">открыть</span>
+                                    <span class="topic-acc-chevron" aria-hidden="true"></span>
+                                </button>
+                                <div class="topic-acc-panel">
+                                    <p>Летом тысяча девятьсот сорок четвертого года началась знаменитая наступательная операция «Багратион», целью которой было полное освобождение белорусской земли. Советские войска продвигались вперед сквозь непроходимые болота и густые леса, что стало полной неожиданностью для врага.</p><p>Третьего июля был освобожден город Минск. В окружение попала огромная группировка гитлеровских войск. Точные удары регулярной армии сливались с решительными действиями партизан. Разгром фашистов в Беларуси вошел в историю как одна из величайших битв Второй мировой войны, приблизивших окончательное падение нацизма.</p>
+                                </div>
+                            </div>
+                            <div class="topic-acc">
+                                <button type="button" class="topic-acc-toggle" onclick="event.stopPropagation(); toggleTopicAccordion(this)" aria-expanded="false">
+                                    <span class="topic-acc-title">Память Хатыни</span><span class="toc-dots"></span>
+                                    <span class="topic-acc-hint">открыть</span>
+                                    <span class="topic-acc-chevron" aria-hidden="true"></span>
+                                </button>
+                                <div class="topic-acc-panel">
+                                    <p>Великая Отечественная война оставила белорусскому народу тяжелое наследие — память о страшных трагедиях людей. Символом скорби сотен уничтоженных деревень стал мемориальный комплекс «Хатынь».</p><p>Здесь нет привычных памятников. На месте сожженных домов стоят гранитные венцы срубов, а над ними возвышаются обелиски в виде печных труб. Каждые тридцать секунд над Хатынью раздается протяжный и тревожный звон колоколов. Этот звук плывет над лесами и полями, призывая людей помнить о прошлом и беречь мир на всей Земле.</p>
+                                </div>
+                            </div>
+                            <div class="topic-acc">
+                                <button type="button" class="topic-acc-toggle" onclick="event.stopPropagation(); toggleTopicAccordion(this)" aria-expanded="false">
+                                    <span class="topic-acc-title">Ворота Минска</span><span class="toc-dots"></span>
+                                    <span class="topic-acc-hint">открыть</span>
+                                    <span class="topic-acc-chevron" aria-hidden="true"></span>
+                                </button>
+                                <div class="topic-acc-panel">
+                                    <p>Каждого, кто приезжает в столицу на поезде, встречает величественный архитектурный ансамбль — «Ворота Минска». Это две одиннадцатиэтажные башни, возведенные в стиле сталинского ампира. На левой башне установлены огромные трофейные часы, созданные в Германии более века назад. Их циферблат превышает три метра в диаметре. Правую башню украшает герб бывшей Белорусской ССР. В вечернее время, когда включается праздничная иллюминация, эти башни выглядят особенно торжественно, символизируя гостеприимство и силу белорусской столицы.</p>
+                                </div>
+                            </div>
+                            <div class="topic-acc">
+                                <button type="button" class="topic-acc-toggle" onclick="event.stopPropagation(); toggleTopicAccordion(this)" aria-expanded="false">
+                                    <span class="topic-acc-title">Река Свислочь и Немига</span><span class="toc-dots"></span>
+                                    <span class="topic-acc-hint">открыть</span>
+                                    <span class="topic-acc-chevron" aria-hidden="true"></span>
+                                </button>
+                                <div class="topic-acc-panel">
+                                    <p>Жизнь Минска неразрывно связана с водой. Через весь город плавной лентой течет река Свислочь, вдоль которой раскинулись живописные парки и набережные. Однако в древности важнейшую роль играла другая река — Немига. Именно на её берегах, согласно летописи тысяча шестьдесят седьмого года, произошла знаменитая битва, ставшая первым упоминанием о Минске. Сегодня Немига полностью закована в подземные трубы, и над ней шумят оживленные городские улицы. Но память о древней реке живет в названиях станций метро, кварталов и торговых центров.</p>
+                                </div>
+                            </div>
+                            <div class="topic-acc">
+                                <button type="button" class="topic-acc-toggle" onclick="event.stopPropagation(); toggleTopicAccordion(this)" aria-expanded="false">
+                                    <span class="topic-acc-title">Остров Мужества и Скорби</span><span class="toc-dots"></span>
+                                    <span class="topic-acc-hint">открыть</span>
+                                    <span class="topic-acc-chevron" aria-hidden="true"></span>
+                                </button>
+                                <div class="topic-acc-panel">
+                                    <p>В самом центре Старого города, на реке Свислочь, находится небольшое и святое для минчан место — Остров Слёз. Официально он называется Островом Мужества и Скорби. К нему ведет аккуратный горбатый мостик. В центре острова стоит необычный храм-памятник, посвященный белорусским воинам-интернационалистам, погибшим в Афганистане. На стенах храма высечены имена павших солдат, а внутри плачут матери, чьи фигуры застыли в бронзе. Этот тихий мемориал посреди бурлящего мегаполиса напоминает каждому прохожему о хрупкости человеческой жизни и ценности мирного неба.</p>
+                                </div>
+                            </div>
+                        </div>
+                    `
+                }
+            },
+            // Sheet 3 (разделы 5 и 6)
+            {
+                type: 'paper',
+                front: {
+                    sectionId: "ce_rus",
+                    title: "5. Подготовка к ЦЭ по русскому",
+                    html: `
+                        <p>Этот раздел разработан как пошаговый алгоритм и тактический навигатор для молодого учителя, ведущего выпускной 11 класс к сдаче Централизованного экзамена по русскому языку. Здесь представлен открытый банк тестовых материалов РИКЗ по всем разделам, а также тестовые задания ЦЭ и ЦТ за разные годы.</p>
+                    `
+                },
+                back: {
+                    sectionId: "gifted",
+                    title: "6. Работа с одарёнными учащимися",
+                    html: `
+                        <p>Эта страница - путеводитель для молодого учителя, который поможет при системной подготовке школьников к олимпиадам по русскому языку и литературе. Здесь собраны пособия, сборники нестандартных задач, которые включают в себя трудные вопросы по фонетике, морфемике, этимологии, морфологии, синтаксису и истории языка, даны ключи и комментарии, подробные разборы олимпиадных задач и типичных филологических «ловушек».</p>
+                    `
+                }
+            },
+            // Sheet 4 (разделы 7 и 8)
+            {
+                type: 'paper',
+                front: {
                     sectionId: "pisateli",
-                    title: "4. Русские писатели на уроке русского языка",
+                    title: "7. Русские писатели на уроке русского языка",
                     html: `
                         <p>Использование на уроках русского языка материалов, посвящённых жизни и творчеству писателей, позволяет осуществлять принцип комплексного подхода к обучению.</p>
                         <div class="quote-box">Берегите наш язык, наш прекрасный русский язык — это клад, это достояние, переданное нам нашими предшественниками! (И. Тургенев)</div>
                         <p>Работа с художественным текстом как с единым целым, где языковые явления рассматриваются в их эстетической функции, а анализ сочетает лингвистический и литературоведческий подходы, позволяет изучать систему языка через призму художественного текста.</p>
                     `
-                }
-            },
-            // Sheet 3 (Раздел 5 и Раздел 6)
-            {
-                type: 'paper',
-                front: {
+                },
+                back: {
                     sectionId: "vneklass",
-                    title: "5. Внеклассные мероприятия",
+                    title: "8. Внеклассные мероприятия",
                     html: `
                         <div class="quote-box">Ученик — не сосуд, который нужно наполнить, а факел, который нужно зажечь (Плутарх).</div>
                         <p>Внеклассные мероприятия по русскому языку и литературе позволяют:</p>
@@ -755,10 +948,14 @@
                             <li>совершенствовать навыки публичного выступления.</li>
                         </ul>
                     `
-                },
-                back: {
+                }
+            },
+            // Sheet 5 (разделы 9 и 10)
+            {
+                type: 'paper',
+                front: {
                     sectionId: "reading",
-                    title: "6. Советуем прочитать",
+                    title: "9. Советуем прочитать",
                     html: `
                         <p>Рекомендуемая литература для профессионального развития педагогов-словесников Беларуси:</p>
                         <ul class="bullet-list" style="margin-bottom:15px;">
@@ -770,45 +967,45 @@
                             📌 Изучайте методические сборники Национального института образования на портале adu.by!
                         </div>
                     `
-                }
-            },
-            // Sheet 4 (Раздел 7 и Раздел 8)
-            {
-                type: 'paper',
-                front: {
+                },
+                back: {
                     sectionId: "soveti",
-                    title: "7. Советы молодому учителю",
+                    title: "10. Советы молодому учителю",
                     html: `
                         <p>Быть учителем – значит посвятить свою жизнь детям. Профессия учителя трудна, но почетна и прекрасна. Помните, что самое благое поприще – служение добру и правде; самая верная дорога – дорога честного труда; самый мужественный поступок – признание собственных ошибок; самая прочная жизненная опора – знания.</p>
                         <div class="post-it-note">
                             Создайте для своих учеников возможность получить необычные впечатления, и они вознаградят вас редкостным прилежанием и особым отношением (Дэйв Бёрджес).
                         </div>
                     `
-                },
-                back: {
+                }
+            },
+            // Sheet 6 (разделы 11 и 12)
+            {
+                type: 'paper',
+                front: {
                     sectionId: "russkiy_jaz",
-                    title: "8. Уроки русского языка",
+                    title: "11. Уроки русского языка",
                     html: `
                         <div class="quote-box">Учитель должен снабжать ребенка цветами, из которых он мог бы добывать материал для меда, но перерабатывать его он должен сам (Монтень).</div>
                         <p>Уровень усвоения знаний зависит от формы подачи материала: чем активнее человек вовлечён в процесс, тем глубже усваивается материал. Сначала дайте базовые теоретические знания, затем сделайте абстрактное наглядным (добавьте визуализацию), вовлеките в обсуждение (это позволит глубже погрузиться в тему), потом дайте практическую работу и, наконец, попросите объяснить (обучение других – эффективный способ закрепления знаний).</p>
                     `
-                }
-            },
-            // Sheet 5 (Раздел 9 и Раздел 10)
-            {
-                type: 'paper',
-                front: {
+                },
+                back: {
                     sectionId: "literatura",
-                    title: "9. Уроки русской литературы",
+                    title: "12. Уроки русской литературы",
                     html: `
                         <div class="quote-box">Чтение — это один из истоков мышления и умственного развития (В. Сухомлинский).</div>
                         <p>Урок есть открытие истины, поиск истины и осмысление истины.</p>
                         <p>Урок есть часть жизни ребёнка, и проживание этой жизни должно совершаться на уровне высокой общечеловеческой культуры.</p>
                     `
-                },
-                back: {
+                }
+            },
+            // Sheet 7 (раздел 13)
+            {
+                type: 'paper',
+                front: {
                     sectionId: "notes",
-                    title: "10. Личные заметки учителя",
+                    title: "13. Личные заметки учителя",
                     html: `
                         <p>Вы можете использовать это поле как свой персональный дневник для записей идей, планов на уроки и профессиональных наблюдений:</p>
                         <textarea class="notes-textarea" id="teacherNotes" placeholder="Напишите здесь свои заметки (текст сохраняется автоматически)..." oninput="saveNotes()"></textarea>
@@ -816,9 +1013,19 @@
                             ⚡ Заметки сохраняются только на этом компьютере (в браузере), не в облаке.
                         </div>
                     `
+                },
+                back: {
+                    sectionId: "endleaf",
+                    title: "",
+                    html: `
+                        <div style="display:flex; flex-direction:column; justify-content:center; align-items:center; height:100%; text-align:center;">
+                            <div class="cover-divider" style="margin-bottom:20px; width:80px;"></div>
+                            <p style="font-size:15px; color:#64748b; line-height:1.6;">Страницы для ваших идей и наблюдений.</p>
+                        </div>
+                    `
                 }
             },
-            // Sheet 6
+                        // Sheet 6
             {
                 type: 'backcover',
                 front: {
@@ -848,6 +1055,23 @@
         const defaultFilesMapping = {};
 
         const totalSpreads = pagesData.length;
+
+        function toggleTopicAccordion(btn) {
+            if (!btn) return;
+            const item = btn.closest('.topic-acc');
+            if (!item) return;
+            const open = item.classList.toggle('open');
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+        window.toggleTopicAccordion = toggleTopicAccordion;
+
+        function collapseAllAccordions() {
+            document.querySelectorAll('.topic-acc.open').forEach(item => {
+                item.classList.remove('open');
+                const btn = item.querySelector('.topic-acc-toggle');
+                if (btn) btn.setAttribute('aria-expanded', 'false');
+            });
+        }
 
         // === ИНИЦИАЛИЗАЦИЯ И ПОСТРОЕНИЕ БЛОКНОТА ===
         function createSpiral() {
@@ -922,7 +1146,7 @@
                     }
 
                     // Генерация папок (не для заметок)
-                    const showFiles = sectionId !== 'notes';
+                    const showFiles = sectionId !== 'notes' && sectionId !== 'endleaf';
                     const foldersHTML = showFiles ? buildFoldersHTML(sectionId) : '';
 
                     frontFace.innerHTML = `
@@ -986,7 +1210,7 @@
                         textBodyHTML = activeEditedPageHTML[sectionId];
                     }
 
-                    const showFilesBack = sectionId !== 'notes';
+                    const showFilesBack = sectionId !== 'notes' && sectionId !== 'endleaf';
                     const foldersHTML = showFilesBack ? buildFoldersHTML(sectionId) : '';
 
                     backFace.innerHTML = `
@@ -1171,6 +1395,7 @@
 
         function nextSpread() {
             if (currentSpread >= totalSpreads || isAnimating) return;
+            collapseAllAccordions();
             isAnimating = true;
             animatePen();
             playFlipSound();
@@ -1192,6 +1417,7 @@
         // Предыдущий разворот
         function prevSpread() {
             if (currentSpread <= 0 || isAnimating) return;
+            collapseAllAccordions();
             isAnimating = true;
             animatePen();
             playFlipSound();
@@ -1214,6 +1440,7 @@
         function goToSpread(spread) {
             if (spread < 0 || spread > totalSpreads || isAnimating) return;
             if (spread === currentSpread) return;
+            collapseAllAccordions();
             isAnimating = true;
             animatePen();
             playFlipSound();
@@ -1283,7 +1510,7 @@
 
         function handleSheetClick(sheetIndex, e) {
             if (isAnimating) return;
-            if (e.target.closest('a') || e.target.closest('button') || e.target.closest('textarea') || e.target.closest('.upload-zone') || e.target.closest('.editable-content') || e.target.closest('.page-scroll-content') || e.target.closest('.files-section') || e.target.closest('.subfolder-container')) {
+            if (e.target.closest('a') || e.target.closest('button') || e.target.closest('textarea') || e.target.closest('.upload-zone') || e.target.closest('.editable-content') || e.target.closest('.page-scroll-content') || e.target.closest('.files-section') || e.target.closest('.subfolder-container') || e.target.closest('.topic-acc')) {
                 return;
             }
 
@@ -1936,7 +2163,7 @@
             const stage = () => document.getElementById('notebookStage') || document.querySelector('.scene');
             document.addEventListener('pointerdown', (e) => {
                 if (!stage()?.contains(e.target)) return;
-                if (e.target.closest('a,button,input,textarea,.doc-card,.toc-item,.admin-topbar')) return;
+                if (e.target.closest('a,button,input,textarea,.doc-card,.toc-item,.admin-topbar,.topic-acc')) return;
                 tracking = true;
                 startX = e.clientX;
                 startY = e.clientY;
@@ -1979,6 +2206,7 @@
             renderAllFilesLists();
             ensureSpreadDots();
             updateNavigationUI();
+            migratePageContentIfNeeded();
             
             // Анимация пера при первом открытии блокнота
             setTimeout(animatePen, 1200);
