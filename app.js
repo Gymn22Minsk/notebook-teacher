@@ -538,6 +538,12 @@
 
         // === БАЗОВЫЕ НАСТРОЙКИ И ДАННЫЕ ===
         let currentSpread = 0;
+        let mobileLeaf = 1;
+        const MOBILE_LAYOUT_MQ = window.matchMedia('(max-width: 900px)');
+
+        function isMobileLayout() {
+            return MOBILE_LAYOUT_MQ.matches;
+        }
         let isAnimating = false;
         let isAdminActive = false;
 
@@ -651,43 +657,43 @@
                     html: `
                         <p style="margin-bottom:18px;">В этом блокноте собраны ключевые методические материалы, образцы рабочих документов, а также полезные советы для организации учебного процесса:</p>
                         <div class="toc-list">
-                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(1)">
+                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(1, 1)">
                                 <span>1. Дидактические материалы</span><span class="toc-dots"></span><span class="toc-page">стр. 3</span>
                             </div>
-                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(2)">
+                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(2, 0)">
                                 <span>2. Международный день на уроке русского языка</span><span class="toc-dots"></span><span class="toc-page">стр. 4</span>
                             </div>
-                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(2)">
+                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(2, 1)">
                                 <span>3. Полезные ссылки</span><span class="toc-dots"></span><span class="toc-page">стр. 5</span>
                             </div>
-                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(3)">
+                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(3, 0)">
                                 <span>4. Дидактические материалы по реализации национального компонента</span><span class="toc-dots"></span><span class="toc-page">стр. 6</span>
                             </div>
-                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(3)">
+                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(3, 1)">
                                 <span>5. Подготовка к ЦЭ по русскому</span><span class="toc-dots"></span><span class="toc-page">стр. 7</span>
                             </div>
-                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(4)">
+                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(4, 0)">
                                 <span>6. Работа с одарёнными учащимися</span><span class="toc-dots"></span><span class="toc-page">стр. 8</span>
                             </div>
-                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(4)">
+                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(4, 1)">
                                 <span>7. Русские писатели на уроке русского языка</span><span class="toc-dots"></span><span class="toc-page">стр. 9</span>
                             </div>
-                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(5)">
+                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(5, 0)">
                                 <span>8. Внеклассные мероприятия</span><span class="toc-dots"></span><span class="toc-page">стр. 10</span>
                             </div>
-                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(5)">
+                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(5, 1)">
                                 <span>9. Советуем прочитать</span><span class="toc-dots"></span><span class="toc-page">стр. 11</span>
                             </div>
-                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(6)">
+                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(6, 0)">
                                 <span>10. Советы молодому учителю</span><span class="toc-dots"></span><span class="toc-page">стр. 12</span>
                             </div>
-                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(6)">
+                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(6, 1)">
                                 <span>11. Уроки русского языка</span><span class="toc-dots"></span><span class="toc-page">стр. 13</span>
                             </div>
-                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(7)">
+                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(7, 0)">
                                 <span>12. Уроки русской литературы</span><span class="toc-dots"></span><span class="toc-page">стр. 14</span>
                             </div>
-                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(7)">
+                            <div class="toc-item" onclick="event.stopPropagation(); goToSpread(7, 1)">
                                 <span>13. Личные заметки учителя</span><span class="toc-dots"></span><span class="toc-page">стр. 15</span>
                             </div>
                         </div>
@@ -1360,11 +1366,19 @@
             if (prevBtn) prevBtn.disabled = currentSpread <= 0;
             if (nextBtn) nextBtn.disabled = currentSpread >= totalSpreads;
 
-            const label = currentSpread === 0
-                ? 'Обложка'
-                : currentSpread === totalSpreads
-                    ? 'Конец'
-                    : `Разворот ${currentSpread} · ${totalSpreads}`;
+            let label;
+            if (isMobileLayout()) {
+                if (currentSpread === 0) label = 'Обложка';
+                else if (currentSpread >= totalSpreads) label = 'Конец';
+                else if (mobileLeaf === 0) label = `стр. ${currentSpread * 2}`;
+                else label = `стр. ${currentSpread * 2 + 1}`;
+            } else {
+                label = currentSpread === 0
+                    ? 'Обложка'
+                    : currentSpread === totalSpreads
+                        ? 'Конец'
+                        : `Разворот ${currentSpread} · ${totalSpreads}`;
+            }
 
             const ind = document.getElementById('spreadIndicator');
             if (ind) ind.textContent = label;
@@ -1428,7 +1442,31 @@
                 }
             });
             updateZIndices();
+            updateMobileActiveSheet();
             updateNavigationUI();
+        }
+
+        function updateMobileActiveSheet() {
+            const on = isMobileLayout();
+            document.body.classList.toggle('mobile-layout', on);
+            document.querySelectorAll('.page-sheet').forEach(sheet => {
+                sheet.classList.remove('is-mobile-active');
+            });
+            if (!on) return;
+            let idx;
+            if (currentSpread <= 0) {
+                idx = 0;
+                mobileLeaf = 1;
+            } else if (currentSpread >= totalSpreads) {
+                idx = totalSpreads - 1;
+                mobileLeaf = 1;
+            } else if (mobileLeaf === 0) {
+                idx = currentSpread - 1;
+            } else {
+                idx = currentSpread;
+            }
+            const sheet = document.querySelector(`.page-sheet[data-index="${idx}"]`);
+            if (sheet) sheet.classList.add('is-mobile-active');
         }
 
         // Анимация пера при перелистывании
@@ -1450,8 +1488,18 @@
         }
 
         function nextSpread() {
+            if (isMobileLayout() && currentSpread > 0 && currentSpread < totalSpreads && mobileLeaf === 0) {
+                if (isAnimating) return;
+                collapseAllAccordions();
+                mobileLeaf = 1;
+                updateMobileActiveSheet();
+                updateNavigationUI();
+                resetPageScroll();
+                return;
+            }
             if (currentSpread >= totalSpreads || isAnimating) return;
             collapseAllAccordions();
+            if (isMobileLayout()) mobileLeaf = 0;
             isAnimating = true;
             animatePen();
             playFlipSound();
@@ -1464,6 +1512,7 @@
             currentSpread++;
             setTimeout(() => {
                 updateZIndices();
+                updateMobileActiveSheet();
                 updateNavigationUI();
                 resetPageScroll();
                 isAnimating = false;
@@ -1472,8 +1521,18 @@
 
         // Предыдущий разворот
         function prevSpread() {
+            if (isMobileLayout() && currentSpread > 0 && currentSpread < totalSpreads && mobileLeaf === 1) {
+                if (isAnimating) return;
+                collapseAllAccordions();
+                mobileLeaf = 0;
+                updateMobileActiveSheet();
+                updateNavigationUI();
+                resetPageScroll();
+                return;
+            }
             if (currentSpread <= 0 || isAnimating) return;
             collapseAllAccordions();
+            if (isMobileLayout()) mobileLeaf = currentSpread - 1 === 0 ? 1 : 1;
             isAnimating = true;
             animatePen();
             playFlipSound();
@@ -1486,6 +1545,7 @@
 
             setTimeout(() => {
                 updateZIndices();
+                updateMobileActiveSheet();
                 updateNavigationUI();
                 resetPageScroll();
                 isAnimating = false;
@@ -1493,9 +1553,16 @@
         }
 
         // Перейти на определенный разворот
-        function goToSpread(spread) {
+        function goToSpread(spread, leaf) {
             if (spread < 0 || spread > totalSpreads || isAnimating) return;
-            if (spread === currentSpread) return;
+            if (typeof leaf === 'number') mobileLeaf = leaf;
+            else if (isMobileLayout()) mobileLeaf = spread === 0 ? 1 : 0;
+            if (spread === currentSpread) {
+                updateMobileActiveSheet();
+                updateNavigationUI();
+                resetPageScroll();
+                return;
+            }
             collapseAllAccordions();
             isAnimating = true;
             animatePen();
@@ -1508,6 +1575,7 @@
                     if (i >= spread) {
                         currentSpread = spread;
                         updateZIndices();
+                        updateMobileActiveSheet();
                         updateNavigationUI();
                         resetPageScroll();
                         isAnimating = false;
@@ -1525,6 +1593,7 @@
                     if (i < spread) {
                         currentSpread = spread;
                         updateZIndices();
+                        updateMobileActiveSheet();
                         updateNavigationUI();
                         resetPageScroll();
                         isAnimating = false;
@@ -1552,7 +1621,9 @@
             function flipBack() {
                 if (count <= 0) {
                     currentSpread = 0;
+                    mobileLeaf = 1;
                     updateZIndices();
+                    updateMobileActiveSheet();
                     updateNavigationUI();
                     isAnimating = false;
                     return;
@@ -1565,6 +1636,7 @@
         }
 
         function handleSheetClick(sheetIndex, e) {
+            if (isMobileLayout()) return;
             if (isAnimating) return;
             if (e.target.closest('a') || e.target.closest('button') || e.target.closest('textarea') || e.target.closest('.upload-zone') || e.target.closest('.editable-content') || e.target.closest('.page-scroll-content') || e.target.closest('.files-section') || e.target.closest('.subfolder-container') || e.target.closest('.topic-acc')) {
                 return;
@@ -1600,6 +1672,7 @@
         function isActiveScrollContainer(container) {
             const sheet = container.closest('.page-sheet');
             if (!sheet) return false;
+            if (isMobileLayout()) return sheet.classList.contains('is-mobile-active');
             const index = parseInt(sheet.dataset.index);
             const isFlipped = sheet.classList.contains('flipped');
             return (index === currentSpread - 1 && isFlipped) || (index === currentSpread && !isFlipped);
@@ -2234,6 +2307,21 @@
             });
             document.addEventListener('pointercancel', () => { tracking = false; });
         })();
+
+        function onMobileLayoutChange() {
+            if (!isMobileLayout()) {
+                document.body.classList.remove('mobile-layout');
+                document.querySelectorAll('.page-sheet').forEach(sheet => {
+                    sheet.classList.remove('is-mobile-active');
+                });
+            }
+            applySpread();
+        }
+        if (MOBILE_LAYOUT_MQ.addEventListener) {
+            MOBILE_LAYOUT_MQ.addEventListener('change', onMobileLayoutChange);
+        } else if (MOBILE_LAYOUT_MQ.addListener) {
+            MOBILE_LAYOUT_MQ.addListener(onMobileLayoutChange);
+        }
 
         // === СТАРТ ПРИЛОЖЕНИЯ ===
         initDB().then(async () => {
