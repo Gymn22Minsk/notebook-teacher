@@ -184,14 +184,8 @@
                     clearTimeout(firebaseFolderRenderTimeout);
                     firebaseFolderRenderTimeout = setTimeout(() => {
                         console.log("🔄 Получены обновления папок из Firebase!");
-                        const savedNotes = document.getElementById("teacherNotes")?.value;
-                        createPages();
-                        applySpread();
+                        syncFoldersIntoDOM();
                         renderAllFilesLists();
-                        if (savedNotes !== undefined) {
-                            const el = document.getElementById("teacherNotes");
-                            if (el) el.value = savedNotes;
-                        }
                     }, 300);
                 });
             } catch (error) {
@@ -1089,7 +1083,7 @@
             const pageFolders = activeFolders.filter(f => f.sectionId === sectionId);
             pageFolders.forEach(folder => {
                 foldersHTML += `
-                            <div class="subfolder-container">
+                            <div class="subfolder-container" data-folder-id="${folder.id}">
                                 <div class="subfolder-header">
                                     <span class="subfolder-icon">📁</span>
                                     <span class="subfolder-title">${folder.label}</span>
@@ -1103,6 +1097,68 @@
                             </div>`;
             });
             return foldersHTML;
+        }
+
+        function buildFolderBlockHTML(folder) {
+            const safeLabel = String(folder.label || '').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+            return `
+                            <div class="subfolder-container" data-folder-id="${folder.id}">
+                                <div class="subfolder-header">
+                                    <span class="subfolder-icon">📁</span>
+                                    <span class="subfolder-title">${safeLabel}</span>
+                                    ${isAdminActive ? `<button type="button" class="delete-btn" onclick="deleteCustomFolder('${folder.id}')" title="Удалить папку">&times;</button>` : ''}
+                                </div>
+                                <div class="subfolder-body">
+                                    <div class="files-section" data-section="${folder.sectionId}" data-subfolder="${folder.id}" style="border:none; background:none; padding:0; margin:0;">
+                                        <div class="files-list"></div>
+                                    </div>
+                                </div>
+                            </div>`;
+        }
+
+        function capturePageScrolls() {
+            const map = {};
+            document.querySelectorAll('.page-scroll-content').forEach(el => {
+                const id = el.querySelector('.editable-content')?.dataset.pageId
+                    || el.querySelector('.files-section')?.dataset.section;
+                if (id) map[id] = el.scrollTop;
+            });
+            return map;
+        }
+
+        function restorePageScrolls(map) {
+            if (!map) return;
+            document.querySelectorAll('.page-scroll-content').forEach(el => {
+                const id = el.querySelector('.editable-content')?.dataset.pageId
+                    || el.querySelector('.files-section')?.dataset.section;
+                if (id && map[id] != null) el.scrollTop = map[id];
+            });
+        }
+
+        function syncFoldersIntoDOM() {
+            const scrolls = capturePageScrolls();
+            SECTIONS.forEach(sec => {
+                const root = document.querySelector(`.files-section[data-section="${sec.id}"][data-subfolder=""]`);
+                if (!root) return;
+                const host = root.closest('.page-scroll-content');
+                if (!host) return;
+
+                const wanted = activeFolders.filter(f => f.sectionId === sec.id);
+                wanted.forEach(folder => {
+                    if (host.querySelector(`.files-section[data-subfolder="${folder.id}"]`)) return;
+                    const lastFolder = [...host.querySelectorAll('.subfolder-container')].pop();
+                    const html = buildFolderBlockHTML(folder);
+                    if (lastFolder) lastFolder.insertAdjacentHTML('afterend', html);
+                    else root.insertAdjacentHTML('afterend', html);
+                });
+
+                host.querySelectorAll('.subfolder-container').forEach(node => {
+                    const fid = node.dataset.folderId
+                        || node.querySelector('.files-section')?.dataset.subfolder;
+                    if (fid && !wanted.find(f => f.id === fid)) node.remove();
+                });
+            });
+            restorePageScrolls(scrolls);
         }
 
         function createPages() {
@@ -1595,7 +1651,7 @@
         document.addEventListener('wheel', (e) => {
             const target = e.target;
             if (!target || !target.closest) return;
-            if (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.closest('[contenteditable="true"]')) return;
+            if (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT') return;
 
             const scrollContainer = resolveScrollContainer(target, e.clientX);
             if (!scrollContainer) return;
@@ -1729,6 +1785,7 @@
         }
         
         function renderAllFilesLists() {
+            const scrolls = capturePageScrolls();
             let totalFiles = 0;
             document.querySelectorAll('.files-section').forEach(section => {
                 const sectionId = section.dataset.section;
@@ -1833,6 +1890,7 @@
                     listEl.appendChild(tools);
                 }
             });
+            restorePageScrolls(scrolls);
         }
 
         // Удаление файла (любого: как своего, так и предустановленного)
@@ -1878,9 +1936,7 @@
             
             saveFolderToFirebase(newFolder);
 
-            // Перерисовываем и рендерим
-            createPages();
-            applySpread();
+            syncFoldersIntoDOM();
             renderAllFilesLists();
         }
 
@@ -1909,8 +1965,7 @@
                 });
 
                 Promise.all(deletePromises).then(() => {
-                    createPages();
-                    applySpread();
+                    syncFoldersIntoDOM();
                     renderAllFilesLists();
                 }).catch(e => console.error(e));
             }
